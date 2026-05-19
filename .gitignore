@@ -1,0 +1,27 @@
+node_modules/
+web/node_modules/
+web/dist/
+
+# Local config and runtime data
+.env
+.env.local
+.env.*.local
+
+# Runtime / output directories
+*.log
+logs/
+data/
+npm-debug.log*
+
+# Car photos directory
+car-images/*
+!car-images/README.md
+
+# IDE / OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local Docker/test artifacts
+test-logs/
