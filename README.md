@@ -250,8 +250,8 @@ Falls man das Image lokal bauen (statt aus GHCR ziehen) möchte:
 
 ```bash
 # Auschecken
-git clone https://github.com/YOUR_GITHUB_USERNAME/neo-kias.git
-cd neo-kias
+git clone https://github.com/christophmerschher/neo-kiaas.git
+cd neo-kiaas
 
 # Image lokal bauen
 docker compose build
