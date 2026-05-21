@@ -1,0 +1,21 @@
+node_modules
+web/node_modules
+web/dist
+.git
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+*.log
+logs/
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+# The DBF data is mounted at runtime, never baked into the image.
+../Daten
+../Update
+../Formulare

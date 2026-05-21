@@ -1,0 +1,74 @@
+# docker-compose.yml — neo-KIAS local deployment
+#
+# Configuration comes from a sibling .env file. Copy .env.example to .env
+# and edit KIAS_DATA_DIR to point at the folder that contains the
+# Daten/, Update/, and Formulare/ subdirectories.
+#
+# By default this pulls a pre-built image from GitHub Container Registry:
+#     ghcr.io/christophmerscher/neo-kiaas:<tag>
+# Override the image (e.g. for forks or development) via NEO_KIAS_IMAGE
+# in .env. To build locally instead of pulling, run:
+#     docker compose build
+#     docker compose up -d
+
+services:
+  neo-kias:
+    image: "${NEO_KIAS_IMAGE:-ghcr.io/christophmerscher/neo-kiaas}:${IMAGE_TAG:-latest}"
+    # `build` is kept so contributors can `docker compose build` to produce
+    # a local image with the same coordinates. End users who only pull from
+    # GHCR can ignore this — it's a no-op without `--build`.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: neo-kias
+    restart: unless-stopped
+    pull_policy: missing
+
+    # Web UI + JSON API. Override the host-side port via HOST_PORT in .env.
+    ports:
+      - "${HOST_PORT:-5175}:5175"
+
+    environment:
+      # Inside the container the data root is always /data and logs go to
+      # /logs — the host paths are mapped via the volumes below.
+      KIAS_ROOT: /data
+      KIAS_CAR_IMAGES_DIR: /car-images
+      # Off by default — set KIAS_SHOW_CAR_IMAGES=true in .env to enable
+      # the photo / silhouette area in the Fahrzeuge cards.
+      KIAS_SHOW_CAR_IMAGES: "${KIAS_SHOW_CAR_IMAGES:-false}"
+      LOG_DIR: /logs
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      LOG_MAX_SIZE: "${LOG_MAX_SIZE:-10m}"
+      LOG_MAX_FILES: "${LOG_MAX_FILES:-14}"
+      LOG_FREQUENCY: "${LOG_FREQUENCY:-daily}"
+      LOG_STDOUT: "${LOG_STDOUT:-true}"
+      PORT: "5175"
+      HOST: "0.0.0.0"
+      NODE_ENV: production
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      # Read-only mount of the DBF data folder (Daten/, Update/, Formulare/).
+      # The :? syntax makes "docker compose up" fail loudly if KIAS_DATA_DIR
+      # is not set in .env — better than silently mounting nothing.
+      - "${KIAS_DATA_DIR:?Set KIAS_DATA_DIR in .env to the host path containing Daten/, Update/, Formulare/}:/data:ro"
+      # Writable mount for rotated log files. Defaults to ./logs in the
+      # compose directory. The host path must be writable by uid 1000
+      # (the container's "node" user).
+      - "${KIAS_LOG_DIR:-./logs}:/logs"
+      # Optional read-only mount for car-model photos. Drop transparent
+      # PNG/WebP files named <model-slug>.<ext> in here (see README for
+      # filename rules). If the directory is empty or doesn't exist, the
+      # UI falls back to generic SVG silhouettes.
+      - "${KIAS_CAR_IMAGES_DIR:-./car-images}:/car-images:ro"
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:5175/api/status | grep -q '\"loaded\":true' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+    # tmpfs so the container's writable layer stays small.
+    tmpfs:
+      - /tmp
