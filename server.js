@@ -19,7 +19,7 @@ const { SearchEngine } = require('./lib/search/SearchEngine');
 const { ReferenceResolver } = require('./lib/search/ReferenceResolver');
 const { buildApp } = require('./lib/api/routes');
 
-async function main() {
+function main() {
   logger.info({
     root: config.dataRoot,
     carImages: {
@@ -31,25 +31,32 @@ async function main() {
   }, 'neo-KIAS starting');
 
   const store = new Store(config.dataRoot, { logger });
-  await store.load();
-
   const search = new SearchEngine(store);
   const resolver = new ReferenceResolver(store);
 
+  // Start serving HTTP immediately so the frontend can render a loading
+  // screen while the (~2-minute) DBF read+merge runs in the background.
+  // Data-dependent /api routes return 503 until store.load() completes;
+  // /api/status stays available throughout so the UI can poll for progress.
   const app = buildApp({ config, logger, store, search, resolver });
-
   app.listen(config.port, config.host, () => {
     logger.info(
       { host: config.host, port: config.port },
-      `listening on http://${config.host}:${config.port}`,
+      `listening on http://${config.host}:${config.port} (data load in progress)`,
     );
   });
+
+  // Kick off the load. We log success/failure but don't tie it to listen()
+  // — the server keeps serving the loading screen + /api/status either way.
+  store.load()
+    .then(() => logger.info('initial data load complete; serving live requests'))
+    .catch(err => {
+      logger.fatal({ err: err.message, stack: err.stack }, 'initial data load failed');
+      process.exit(1);
+    });
 }
 
-main().catch(err => {
-  logger.fatal({ err: err.message, stack: err.stack }, 'fatal startup error');
-  process.exit(1);
-});
+main();
 
 // Flush log buffers on shutdown so the very last requests aren't lost.
 for (const sig of ['SIGINT', 'SIGTERM']) {

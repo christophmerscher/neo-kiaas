@@ -33,6 +33,13 @@ import { Detail } from './components/Detail';
 
 import { ScodesPage } from './pages/ScodesPage';
 import { VehiclesPage } from './pages/VehiclesPage';
+import { LoadingPage } from './pages/LoadingPage';
+
+/** Interval (ms) between /api/status polls while waiting for the data load. */
+const STATUS_POLL_INTERVAL = 1500;
+/** Time (ms) to keep the LoadingPage on screen once status flips to loaded,
+ *  so the success-check animation has time to play. */
+const BOOT_ANIMATION_HOLD_MS = 1400;
 
 export default function App() {
   // ── Lookup data fetched from the API once on mount ──────────────────
@@ -40,24 +47,55 @@ export default function App() {
   const [vehicles, setVehicles]   = useState([]);
   const [scodes, setScodes]       = useState([]);
   const [carImages, setCarImages] = useState({});
+  /** True once the post-load success animation has finished — gates the
+   *  switch from LoadingPage to the main UI. */
+  const [bootAnimationDone, setBootAnimationDone] = useState(false);
 
+  // 1) Poll /api/status until the backend reports loaded:true.
+  //    While loading, the rest of the API returns 503 and the UI shows
+  //    <LoadingPage />. This also handles "server not reachable yet" —
+  //    the fetch just rejects and we retry on the next tick.
   useEffect(() => {
-    getJson('/api/status').then(stat => {
-      setStatus(stat);
-      // Only fetch the photo catalog if the feature is enabled server-side.
-      if (stat?.features?.carImages) {
-        getJson('/api/car-images').then(list => {
-          const map = {};
-          for (const item of list || []) {
-            if (item && item.slug && item.file) map[item.slug] = item.file;
-          }
-          setCarImages(map);
-        }).catch(() => {});
-      }
-    }).catch(() => {});
+    let cancelled = false;
+    let timer = null;
+
+    async function poll() {
+      try {
+        const stat = await getJson('/api/status');
+        if (cancelled) return;
+        setStatus(stat);
+        if (stat && stat.loaded) return;   // done — stop polling
+      } catch { /* server not ready */ }
+      if (!cancelled) timer = setTimeout(poll, STATUS_POLL_INTERVAL);
+    }
+    poll();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, []);
+
+  // 2) Once the backend reports loaded, fetch the lookup data once and
+  //    schedule the boot-animation hand-off.
+  useEffect(() => {
+    if (!status?.loaded) return;
     getJson('/api/vehicles').then(setVehicles).catch(() => {});
     getJson('/api/scodes').then(setScodes).catch(() => {});
-  }, []);
+    if (status.features?.carImages) {
+      getJson('/api/car-images').then(list => {
+        const map = {};
+        for (const item of list || []) {
+          if (item && item.slug && item.file) map[item.slug] = item.file;
+        }
+        setCarImages(map);
+      }).catch(() => {});
+    }
+  }, [status?.loaded, status?.features?.carImages]);
+
+  // 3) Keep <LoadingPage /> visible briefly after the data lands so the
+  //    success-check animation has time to play before we hand off.
+  useEffect(() => {
+    if (!status?.loaded || bootAnimationDone) return;
+    const t = setTimeout(() => setBootAnimationDone(true), BOOT_ANIMATION_HOLD_MS);
+    return () => clearTimeout(t);
+  }, [status?.loaded, bootAnimationDone]);
 
   const showCarImages = Boolean(status?.features?.carImages);
 
@@ -165,6 +203,19 @@ export default function App() {
     : 0;
 
   // ── Dispatch on URL mode ────────────────────────────────────────────
+
+  // Server still warming up — or the post-load success animation hasn't
+  // finished yet? Either way, keep the dedicated loading screen up.
+  // Pass `loaded` so the LoadingPage can switch from spinner+progress to
+  // the green check-circle the moment the data lands.
+  if (!status || !status.loaded || !bootAnimationDone) {
+    return (
+      <LoadingPage
+        progress={status?.progress}
+        loaded={Boolean(status?.loaded)}
+      />
+    );
+  }
 
   if (page === 'vehicles') {
     return (
