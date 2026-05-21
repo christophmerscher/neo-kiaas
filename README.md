@@ -31,19 +31,7 @@ docker compose up -d
 
 ## Image-Tags
 
-Veröffentlicht auf [GitHub Container Registry](https://github.com/christophmerscher/neo-kias/pkgs/container/neo-kias):
-
-| Tag        | Bedeutung                                                                      |
-|------------|--------------------------------------------------------------------------------|
-| `latest`   | Aktueller Stand des `main`-Branch (rolling). Ideal zum Mitschwimmen.           |
-| `1.0.0`    | Konkrete Release-Version (semver). Pinning für reproduzierbare Deployments.    |
-| `1.0`      | Letzte Minor-Version (z. B. `1.0.0`, `1.0.1`, ...).                              |
-| `1`        | Letzte Major-Version.                                                          |
-| `main`     | Identisch mit `latest`.                                                        |
-
-Multi-Architektur: jedes Image enthält `linux/amd64` und `linux/arm64` Layer
-(Apple Silicon, Raspberry Pi 4/5, etc.). Docker zieht automatisch die passende
-Variante.
+TBD
 
 ## Architektur
 
@@ -262,8 +250,8 @@ Falls man das Image lokal bauen (statt aus GHCR ziehen) möchte:
 
 ```bash
 # Auschecken
-git clone https://github.com/YOUR_GITHUB_USERNAME/neo-kias.git
-cd neo-kias
+git clone https://github.com/christophmerschher/neo-kiaas.git
+cd neo-kiaas
 
 # Image lokal bauen
 docker compose build
