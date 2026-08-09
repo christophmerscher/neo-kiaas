@@ -36,6 +36,10 @@ services:
       # Off by default — set KIAS_SHOW_CAR_IMAGES=true in .env to enable
       # the photo / silhouette area in the Fahrzeuge cards.
       KIAS_SHOW_CAR_IMAGES: "${KIAS_SHOW_CAR_IMAGES:-false}"
+      # Search tuning: precomputed lowercase blobs (faster, ~100 MB more
+      # heap) and how many filter combinations stay memoized.
+      KIAS_SEARCH_BLOBS: "${KIAS_SEARCH_BLOBS:-true}"
+      KIAS_SEARCH_CACHE: "${KIAS_SEARCH_CACHE:-50}"
       LOG_DIR: /logs
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_MAX_SIZE: "${LOG_MAX_SIZE:-10m}"

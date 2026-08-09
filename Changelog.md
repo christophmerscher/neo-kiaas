@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Search is substantially faster. Rows now carry a precomputed lowercased
+  blob of their text fields, so a query does one `includes` per row instead
+  of lowercasing every field again: first-time queries drop from roughly
+  100-150 ms to 25-90 ms.
+- Match lists are memoized per filter combination (LRU, 50 entries by
+  default), so repeated queries and paging through a result set answer in
+  well under a millisecond. The cache is dropped on every data reload.
+- `/api/status` reports `searchCache` counters (hits, misses, evictions).
+
+### Added
+- `KIAS_SEARCH_BLOBS` (default `true`) to trade the roughly 100 MB the
+  blobs cost against query speed, and `KIAS_SEARCH_CACHE` (default `50`)
+  to size the memoization cache.
+
 ## [1.0.0-alpha] — 2026-05-19
 
 ### Added

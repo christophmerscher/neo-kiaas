@@ -10,7 +10,8 @@ web/dist/
 # Runtime / output directories
 *.log
 logs/
-data/
+# Anchored: an unanchored "data/" also swallows lib/data/.
+/data/
 npm-debug.log*
 
 # Car photos directory

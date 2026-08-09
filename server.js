@@ -28,10 +28,11 @@ function main() {
       exists: config.showCarImages && fs.existsSync(config.carImagesDir),
     },
     logging: logger.kiasConfig,
+    search: { blobs: config.searchBlobs, cacheSize: config.searchCacheSize },
   }, 'neo-KIAS starting');
 
-  const store = new Store(config.dataRoot, { logger });
-  const search = new SearchEngine(store);
+  const store = new Store(config.dataRoot, { logger, searchBlobs: config.searchBlobs });
+  const search = new SearchEngine(store, { cacheSize: config.searchCacheSize });
   const resolver = new ReferenceResolver(store);
 
   // Start serving HTTP immediately so the frontend can render a loading

@@ -93,6 +93,19 @@ docker compose up -d --build
 Innerhalb des Containers wird das Datenverzeichnis readonly nach `/data`
 gemountet; die Variable `KIAS_ROOT=/data` weist die Anwendung dort hinein.
 
+#### Suche und Speicherbedarf
+
+| Variable            | Default | Beschreibung |
+|---------------------|---------|--------------|
+| `KIAS_SEARCH_BLOBS` | `true`  | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird dadurch rund 2- bis 4-mal schneller, der Prozess braucht aber etwa 100 MB mehr Arbeitsspeicher. |
+| `KIAS_SEARCH_CACHE` | `50`    | Anzahl der Filterkombinationen, deren Trefferliste im Speicher gehalten wird. Wiederholte Suchen und das Blättern durch eine Trefferliste werden daraus bedient, also in unter einer Millisekunde. Der Cache wird bei jedem Reload verworfen. |
+
+Grober Anhaltspunkt auf dem Referenzdatenstand (12.093 Aktionen, 216.049
+Fahrzeug-Verknüpfungen): mit Blobs rund 400 MB RSS und 25 bis 90 ms je
+neuer Suche, ohne Blobs rund 300 MB RSS und 100 bis 160 ms. Die Zähler
+unter `searchCache` in `/api/status` zeigen, wie oft der Cache greift.
+
+
 ### Netzwerkfreigaben (SMB / NFS)
 
 Mount auf dem Host vornehmen, anschließend in `.env` den Mountpoint angeben:
