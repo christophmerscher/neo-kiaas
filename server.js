@@ -49,11 +49,16 @@ function main() {
     },
     logging: logger.kiasConfig,
     search: { blobs: config.searchBlobs, cacheSize: config.searchCacheSize },
+    history: config.history,
   }, 'neo-KIAS starting');
 
   checkDataRoot();
 
-  const store = new Store(config.dataRoot, { logger, searchBlobs: config.searchBlobs });
+  const store = new Store(config.dataRoot, {
+    logger,
+    searchBlobs: config.searchBlobs,
+    history: config.history,
+  });
   const search = new SearchEngine(store, { cacheSize: config.searchCacheSize });
   const resolver = new ReferenceResolver(store);
 

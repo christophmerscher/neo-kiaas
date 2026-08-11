@@ -113,9 +113,10 @@ gemountet; die Variable `KIAS_ROOT=/data` weist die Anwendung dort hinein.
 |---------------------|---------|--------------|
 | `KIAS_SEARCH_BLOBS` | `true`  | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird dadurch rund 2- bis 4-mal schneller, der Prozess braucht aber etwa 100 MB mehr Arbeitsspeicher. |
 | `KIAS_SEARCH_CACHE` | `50`    | Anzahl der Filterkombinationen, deren Trefferliste im Speicher gehalten wird. Wiederholte Suchen und das Blättern durch eine Trefferliste werden daraus bedient, also in unter einer Millisekunde. Der Cache wird bei jedem Reload verworfen. |
+| `KIAS_HISTORY` | `true` | Änderungshistorie der Updates mitschreiben. Schaltet die Seite **Änderungen** frei und blendet bei einer Suche nach einem nicht mehr vorhandenen Aktionscode ein, was mit ihm passiert ist. Kostet rund eine halbe Sekunde Ladezeit und wenige hundert KB. Auf `false` verschwinden Seite und Fußzeilen-Link. |
 
-Grober Anhaltspunkt auf dem Referenzdatenstand (12.093 Aktionen, 216.049
-Fahrzeug-Verknüpfungen): mit Blobs rund 400 MB RSS und 25 bis 90 ms je
+Grober Anhaltspunkt auf dem Referenzdatenstand (rund 12.200 Aktionen,
+220.000 Fahrzeug-Verknüpfungen): mit Blobs rund 400 MB RSS und 25 bis 90 ms je
 neuer Suche, ohne Blobs rund 300 MB RSS und 100 bis 160 ms. Die Zähler
 unter `searchCache` in `/api/status` zeigen, wie oft der Cache greift.
 
@@ -233,6 +234,27 @@ npm run dev:server
 npm run dev:web
 ```
 
+## Änderungen (Update-Historie)
+
+KIAS liefert seine Daten als Basisstand plus eine nummerierte Kette von
+Update-Dateien. Beim Zusammenführen entsteht der aktuelle Stand, und die
+Zwischenschritte gehen verloren: eine Aktion, die ein Update aufnimmt und
+ein späteres zurückzieht, ist danach spurlos verschwunden.
+
+Die Seite **Änderungen** (Link in der Fußzeile der Startseite) hält diesen
+Verlauf fest. Je Update-Datei steht dort, was neu kam, was geändert wurde,
+was eine neue Nummer bekam und was zurückgezogen wurde, jeweils mit dem
+Zeitraum aus `FO_Up.DBF`. Ein Klick auf einen Code sucht danach.
+
+Sucht man einen Aktionscode, den es nicht mehr gibt, erklärt die
+Trefferliste den Grund, statt leer zu bleiben:
+
+> **25SC4** gab es, wurde aber mit Update 007 / 2026 (30.04.2026)
+> zurückgezogen und ist deshalb nicht mehr im Bestand.
+
+Umnummerierte Aktionen verweisen auf ihren neuen Code
+(`WN003/2026` → `WN003/26`).
+
 ## API-Endpoints
 
 - `GET  /api/status` – Ladewtatus & Zähler
@@ -240,6 +262,7 @@ npm run dev:web
 - `GET  /api/bulletins?q=&fz=&scode=&keyword=&yearFrom=&yearTo=&limit=&offset=`
 - `GET  /api/bulletin/:code` – Volltext inkl. verknüpfter Daten
 - `GET  /api/vehicles`, `GET /api/scodes`, `GET /api/updates`
+- `GET  /api/history` – Änderungen je Update-Datei (leer, wenn `KIAS_HISTORY=false`)
 - `GET  /api/forms/:file` – Formular PDF ausliefern
 
 ## Release-Prozess (für Maintainer)

@@ -16,7 +16,7 @@
  * @property {string}      yearFrom  Lower year bound
  * @property {string}      yearTo    Upper year bound
  * @property {string|null} selected  A_CODE currently being viewed (detail)
- * @property {string}      page      Top-level page mode ('' | 'scodes' | 'vehicles')
+ * @property {string}      page      Top-level page mode ('' | 'scodes' | 'vehicles' | 'history')
  * @property {string}      cat       Category drilled into on a list page
  */
 
@@ -64,13 +64,14 @@ export function writeUrl(s) {
  * by App.jsx to pick which page to render.
  *
  * @param {UrlState} s
- * @returns {'scodes-cat'|'scodes'|'vehicles-cat'|'vehicles'|'detail'|'results'|'landing'}
+ * @returns {'scodes-cat'|'scodes'|'vehicles-cat'|'vehicles'|'history'|'detail'|'results'|'landing'}
  */
 export function modeOf(s) {
   if (s.page === 'scodes' && s.cat)   return 'scodes-cat';
   if (s.page === 'scodes')            return 'scodes';
   if (s.page === 'vehicles' && s.cat) return 'vehicles-cat';
   if (s.page === 'vehicles')          return 'vehicles';
+  if (s.page === 'history')           return 'history';
   if (s.selected)                     return 'detail';
   if (s.q || s.fz || s.scode || s.keyword || s.yearFrom || s.yearTo) return 'results';
   return 'landing';

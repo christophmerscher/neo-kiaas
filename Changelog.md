@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Neue Seite **Änderungen**: Changelog der KIAS-Update-Kette. Je
+  Update-Datei ist zu sehen, welche Aktionen neu kamen, geändert wurden,
+  eine neue Nummer bekamen oder zurückgezogen wurden, mit dem Zeitraum aus
+  `FO_Up.DBF`. Erreichbar über die Fußzeile der Startseite, filterbar,
+  ein Klick auf einen Code sucht danach.
+- Sucht man einen Aktionscode, den ein Update zurückgezogen oder
+  umnummeriert hat, sagt die Trefferliste das jetzt, statt leer zu bleiben.
+- `GET /api/history` liefert dieselben Daten als JSON.
+- `KIAS_HISTORY` (Default `true`) schaltet das Mitschreiben ab; dann
+  verschwinden Seite, Fußzeilen-Link und Hinweis.
+
+### Fixed
+- Umnummerierte Aktionen gingen beim Zusammenführen verloren. `UPAKTION=2`
+  bedeutet nicht immer "gelöscht": trägt der Satz einen abweichenden
+  `OLDKEY`, wurde die Aktion nur neu nummeriert (`23-2141` → `2141/23`).
+  Der Loader hat in beiden Fällen nur den alten Schlüssel entfernt und den
+  neuen nie angelegt. Auf dem aktuellen Datenstand fehlten dadurch 7 von
+  13 umnummerierten Aktionen (12.198 statt 12.205).
+
 ### Fixed
 - The app now reads its own `.env` when started outside Docker, and
   accepts `KIAS_DATA_DIR` as a fallback for `KIAS_ROOT`. Previously

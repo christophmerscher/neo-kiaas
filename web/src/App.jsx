@@ -8,6 +8,7 @@
  *   - hooks/useDebounced    typing throttle for search
  *   - pages/ScodesPage      Symptomcode browser
  *   - pages/VehiclesPage    Vehicle browser
+ *   - pages/HistoryPage     Changelog of the KIAS update chain
  *   - components/Detail     Bulletin detail panel
  *   - components/LinkedText Inline reference rendering inside long text
  *   - components/InfoModal  About / disclaimer / license
@@ -33,6 +34,7 @@ import { Detail } from './components/Detail';
 
 import { ScodesPage } from './pages/ScodesPage';
 import { VehiclesPage } from './pages/VehiclesPage';
+import { HistoryPage } from './pages/HistoryPage';
 import { LoadingPage } from './pages/LoadingPage';
 
 /** Interval (ms) between /api/status polls while waiting for the data load. */
@@ -47,6 +49,9 @@ export default function App() {
   const [vehicles, setVehicles]   = useState([]);
   const [scodes, setScodes]       = useState([]);
   const [carImages, setCarImages] = useState({});
+  /** Update changelog, fetched lazily the first time the page is opened. */
+  const [history, setHistory] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   /** True once the post-load success animation has finished — gates the
    *  switch from LoadingPage to the main UI. */
   const [bootAnimationDone, setBootAnimationDone] = useState(false);
@@ -159,6 +164,16 @@ export default function App() {
     getJson(`/api/bulletin/${encodeURIComponent(selected)}`).then(setDetail);
   }, [selected]);
 
+  // The changelog is a few hundred KB, so it is fetched once, the first
+  // time the page is actually opened, and then kept.
+  useEffect(() => {
+    if (page !== 'history' || history || historyLoading) return;
+    setHistoryLoading(true);
+    getJson('/api/history')
+      .then(h => { setHistory(h); setHistoryLoading(false); })
+      .catch(() => { setHistory({ enabled: false, totals: null, updates: [] }); setHistoryLoading(false); });
+  }, [page, history, historyLoading]);
+
   // ── Action handlers ─────────────────────────────────────────────────
   const reload = async () => setStatus(await postJson('/api/reload'));
 
@@ -179,6 +194,7 @@ export default function App() {
 
   const openScodes = () => { setSelected(null); setCat(''); setPage('scodes'); };
   const openVehicles = () => { setSelected(null); setCat(''); setPage('vehicles'); };
+  const openHistory = () => { setSelected(null); setCat(''); setPage('history'); };
 
   const selectScodeFilter = (sc) => {
     setPage(''); setCat('');
@@ -261,6 +277,24 @@ export default function App() {
     );
   }
 
+  if (page === 'history') {
+    return (
+      <>
+        <HistoryPage
+          history={history}
+          loading={historyLoading}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onBack={goBack}
+          onHome={resetAll}
+          onOpenInfo={openInfo}
+          onSelectCode={followReference}
+        />
+        {infoOpen && <InfoModal onClose={closeInfo} />}
+      </>
+    );
+  }
+
   if (!hasQuery) {
     return (
       <LandingPage
@@ -271,6 +305,7 @@ export default function App() {
         reload={reload}
         onOpenScodes={openScodes}
         onOpenVehicles={openVehicles}
+        onOpenHistory={openHistory}
         onOpenInfo={openInfo}
         onYearFromShortcut={() => setYearFrom(String(new Date().getFullYear()))}
         infoOpen={infoOpen}
@@ -325,7 +360,7 @@ export default function App() {
 function LandingPage({
   status, q, setQ, view, setView,
   theme, toggleTheme,
-  reload, onOpenScodes, onOpenVehicles, onOpenInfo,
+  reload, onOpenScodes, onOpenVehicles, onOpenHistory, onOpenInfo,
   onYearFromShortcut,
   infoOpen, onCloseInfo,
 }) {
@@ -377,6 +412,12 @@ function LandingPage({
           <button className="linklike" onClick={onOpenScodes}>Symptomcodes</button>
           {' · '}
           <button className="linklike" onClick={onOpenVehicles}>Fahrzeuge</button>
+          {status?.features?.history && (
+            <>
+              {' · '}
+              <button className="linklike" onClick={onOpenHistory}>Änderungen</button>
+            </>
+          )}
           {' · '}
           <button className="linklike" onClick={onOpenInfo}>Über neo-KIAS</button>
         </div>
@@ -647,6 +688,7 @@ function GoogleView({
           qDeb={qDeb}
           setSelected={setSelected}
           vehicleLabel={vehicleLabel}
+          onFollowCode={followReference}
         />
       )}
       {infoOpen && <InfoModal onClose={closeInfo} />}
@@ -654,7 +696,33 @@ function GoogleView({
   );
 }
 
-function ResultsList({ results, loading, qDeb, setSelected, vehicleLabel }) {
+/**
+ * Explains a code that the update chain retired: withdrawn outright, or
+ * renumbered. Shown instead of the generic "try other terms" tip, because
+ * here we know exactly why there is no hit.
+ */
+function FormerNotice({ former, onFollowCode }) {
+  const when = former.updateAt ? ` (${fmtDateTime(former.updateAt)})` : '';
+  return (
+    <div className="former-notice">
+      {former.kind === 'renamed' ? (
+        <>
+          <strong>{former.code}</strong> wurde mit Update {former.updateLabel}{when} umnummeriert auf{' '}
+          <button className="linklike" onClick={() => onFollowCode(former.newCode)}>{former.newCode}</button>.
+        </>
+      ) : (
+        <>
+          <strong>{former.code}</strong> gab es, wurde aber mit Update {former.updateLabel}{when} zurückgezogen
+          und ist deshalb nicht mehr im Bestand.
+        </>
+      )}
+      {former.title && <div className="former-title">{former.title}</div>}
+      {former.date && <div className="former-date">Stand der Aktion: {fmtDateTime(former.date)}</div>}
+    </div>
+  );
+}
+
+function ResultsList({ results, loading, qDeb, setSelected, vehicleLabel, onFollowCode }) {
   return (
     <main className="results-main">
       <div className="results-stats">
@@ -668,9 +736,13 @@ function ResultsList({ results, loading, qDeb, setSelected, vehicleLabel }) {
       {results.results.length === 0 && !loading && (
         <div className="no-results">
           Keine Treffer für <strong>{qDeb || 'diese Filter'}</strong>.
-          <div style={{ marginTop: 8, fontSize: 13 }}>
-            Versuchen Sie andere Begriffe oder entfernen Sie Filter.
-          </div>
+          {results.former ? (
+            <FormerNotice former={results.former} onFollowCode={onFollowCode} />
+          ) : (
+            <div style={{ marginTop: 8, fontSize: 13 }}>
+              Versuchen Sie andere Begriffe oder entfernen Sie Filter.
+            </div>
+          )}
         </div>
       )}
 
