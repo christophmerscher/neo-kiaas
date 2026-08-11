@@ -26,3 +26,32 @@ Thumbs.db
 
 # Local Docker/test artifacts
 test-logs/
+
+# ── KIAS-Datenbestand ───────────────────────────────────────────────────
+# Diese Dateien gehören unter keinen Umständen ins Repository. Sie werden
+# zur Laufzeit gemountet (Docker) oder über KIAS_ROOT gefunden (npm).
+# Die Muster sind bewusst case-insensitiv geschrieben: KIAS mischt die
+# Schreibweisen (FO_AKTION.DBF neben FO_Saetze.dbf), und unter Linux
+# unterscheidet .gitignore Groß- und Kleinschreibung.
+
+# Datenbank-, Memo- und Indexdateien
+*.[Dd][Bb][Ff]
+*.[Cc][Dd][Xx]
+*.[Ff][Pp][Tt]
+*.[Dd][Bb][Tt]
+*.[Rr][Dd][Dd]
+
+# Anhänge und Beiwerk aus Daten/, Update/ und Formulare/
+*.[Pp][Dd][Ff]
+*.[Xx][Ll][Ss]
+*.[Xx][Ll][Ss][Xx]
+*.[Dd][Oo][Cc]
+*.[Ii][Nn][Ii]
+*.[Dd][Ll][Ll]
+*.[Ee][Xx][Ee]
+*.[Zz][Ii][Pp]
+
+# Und die kompletten Datenverzeichnisse, egal an welcher Stelle im Baum
+Daten/
+Update/
+Formulare/
