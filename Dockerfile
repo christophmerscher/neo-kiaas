@@ -28,7 +28,13 @@ ENV NODE_ENV=production
 
 # Install only the server's runtime deps.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+RUN npm ci --omit=dev --no-audit --no-fund \
+    # swagger-ui-dist ships source maps and alternative bundles that the
+    # docs page never requests; dropping them saves ~15 MB in the image.
+    && rm -f node_modules/swagger-ui-dist/*.map \
+             node_modules/swagger-ui-dist/swagger-ui-es-bundle*.js \
+             node_modules/swagger-ui-dist/swagger-ui.js \
+    && npm cache clean --force
 
 # Copy server code and the pre-built UI bundle from stage 1.
 COPY server.js ./

@@ -149,6 +149,7 @@ und `KIAS_DATA_DIR` auf den Mountpoint gesetzt.
 ### Bilder
 
 | Variable | Default | Beschreibung |
+| `KIAS_API_DOCS` | `true` | Swagger UI der JSON Schnittstelle unter `/api/docs`. Wird lokal aus dem Paket `swagger-ui-dist` ausgeliefert, funktioniert also ohne Internet. Auf `false` antwortet der Pfad mit 404. |
 |---|---|---|
 | `KIAS_SHOW_CAR_IMAGES` | `false` | Fotobereich auf den Fahrzeugkarten einschalten. Ohne passendes Bild erscheint eine generische Silhouette. |
 | `KIAS_CAR_IMAGES_DIR` | `./car-images` | Verzeichnis mit den Fahrzeugfotos. Dateiname ist der kleingeschriebene Modellname, etwa `mondeo.png`. |
@@ -200,6 +201,11 @@ Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` ->
 `WN003/26`).
 
 ## API
+
+Die Endpunkte sind unter **http://localhost:5175/api/docs** interaktiv
+dokumentiert (Swagger UI, abschaltbar über `KIAS_API_DOCS`). Die
+Spezifikation allein liegt unter `/api/docs/openapi.json`.
+
 
 - `GET /api/status` – Ladezustand, Zähler, `rootOk`
 - `POST /api/reload` – Daten neu einlesen

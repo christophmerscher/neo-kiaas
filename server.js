@@ -50,6 +50,7 @@ function main() {
     logging: logger.kiasConfig,
     search: { blobs: config.searchBlobs, cacheSize: config.searchCacheSize },
     history: config.history,
+    apiDocs: config.apiDocs,
   }, 'neo-KIAS starting');
 
   checkDataRoot();

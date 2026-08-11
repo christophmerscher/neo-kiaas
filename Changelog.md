@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.2-alpha] — 2026-08-11
+
+### Added
+- Swagger UI under `/api/docs`, describing all twelve endpoints with
+  parameters, response shapes and the 503-while-loading case. Served from
+  the local `swagger-ui-dist` package, so it works without internet
+  access; the bare spec is at `/api/docs/openapi.json`.
+- `KIAS_API_DOCS` (default `true`) switches it off; the path then
+  answers 404.
+
 ## [1.1.1-alpha] — 2026-08-11
 
 ### Fixed
@@ -70,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.1-alpha...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.2-alpha...HEAD
+[1.1.2-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.2-alpha
 [1.1.1-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.1-alpha
 [1.1.0-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.0-alpha
 [1.0.0-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.0.0-alpha

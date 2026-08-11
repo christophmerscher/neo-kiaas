@@ -35,6 +35,8 @@ services:
       KIAS_SEARCH_CACHE: "${KIAS_SEARCH_CACHE:-50}"
       # Update history / "Änderungen" page. false disables tracking.
       KIAS_HISTORY: "${KIAS_HISTORY:-true}"
+      # Swagger UI unter /api/docs.
+      KIAS_API_DOCS: "${KIAS_API_DOCS:-true}"
       LOG_DIR: /logs
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_MAX_SIZE: "${LOG_MAX_SIZE:-10m}"
