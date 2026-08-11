@@ -82,6 +82,26 @@ export function Detail({ detail, vehicleLabel, onNavigateRef, onSelectBulletin }
 
   return (
     <>
+      {detail.former && (
+        <div className="former-notice detail-former">
+          {detail.former.kind === 'renamed' ? (
+            <>
+              <strong>{detail.former.code}</strong> wurde mit Update {detail.former.updateLabel}
+              {detail.former.updateAt ? ` (${fmtDateTime(detail.former.updateAt)})` : ''} umnummeriert auf{' '}
+              <button className="linklike" onClick={() => onSelectBulletin(detail.former.newCode)}>
+                {detail.former.newCode}
+              </button>. Unten steht der letzte Stand unter der alten Nummer.
+            </>
+          ) : (
+            <>
+              Diese Aktion wurde mit Update {detail.former.updateLabel}
+              {detail.former.updateAt ? ` (${fmtDateTime(detail.former.updateAt)})` : ''} zurückgezogen
+              und ist nicht mehr im aktuellen Bestand. Angezeigt wird der letzte bekannte Stand,
+              verknüpfte Fahrzeuge und Symptomcodes sind mit ihr entfallen.
+            </>
+          )}
+        </div>
+      )}
       <h2>
         {detail.A_CODE}
         {detail.N_ART && (

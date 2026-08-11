@@ -255,6 +255,14 @@ Trefferliste den Grund, statt leer zu bleiben:
 Umnummerierte Aktionen verweisen auf ihren neuen Code
 (`WN003/2026` → `WN003/26`).
 
+Zurückgezogene Aktionen bleiben vollständig lesbar: neo-KIAS hebt ihren
+letzten bekannten Datensatz auf und zeigt ihn in der gewohnten
+Detailansicht, mit einem Hinweis darauf, dass die Aktion nicht mehr im
+Bestand ist. Das ist nötig, weil `K_BEZEICH` im KIAS-Schema nur 90 Zeichen
+fasst und der eigentliche Text im Memo-Feld `BESCHREIB` steht, das mit dem
+Datensatz verschwinden würde. Verknüpfte Fahrzeuge und Symptomcodes sind
+mit derselben Update-Datei entfallen und daher leer.
+
 ## API-Endpoints
 
 - `GET  /api/status` – Ladewtatus & Zähler

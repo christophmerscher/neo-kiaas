@@ -18,6 +18,7 @@
  * @property {string|null} selected  A_CODE currently being viewed (detail)
  * @property {string}      page      Top-level page mode ('' | 'scodes' | 'vehicles' | 'history')
  * @property {string}      cat       Category drilled into on a list page
+ * @property {string}      hq        Filter on the "Änderungen" page
  */
 
 /** Parse the current window URL into a UrlState. */
@@ -33,6 +34,7 @@ export function readUrl() {
     selected: p.get('code') || null,
     page:     p.get('page') || '',
     cat:      p.get('cat')  || '',
+    hq:       p.get('hq')   || '',
   };
 }
 
@@ -54,6 +56,7 @@ export function writeUrl(s) {
   if (s.selected) p.set('code', s.selected);
   if (s.page)     p.set('page', s.page);
   if (s.cat)      p.set('cat', s.cat);
+  if (s.hq)       p.set('hq', s.hq);
   const qs = p.toString();
   return qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
 }

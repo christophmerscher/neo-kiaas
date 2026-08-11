@@ -19,12 +19,12 @@ import { readUrl, writeUrl, navKeyOf } from '../utils/url';
  * @returns {{
  *   q:string, fz:string, scode:string, keyword:string,
  *   yearFrom:string, yearTo:string,
- *   selected:string|null, page:string, cat:string,
+ *   selected:string|null, page:string, cat:string, hq:string,
  *   setQ:(v:string)=>void, setFz:(v:string)=>void, setScode:(v:string)=>void,
  *   setKeyword:(v:string)=>void, setYearFrom:(v:string)=>void,
  *   setYearTo:(v:string)=>void,
  *   setSelected:(v:string|null)=>void, setPage:(v:string)=>void,
- *   setCat:(v:string)=>void,
+ *   setCat:(v:string)=>void, setHq:(v:string)=>void,
  *   resetAll:()=>void, goBack:()=>void,
  * }}
  */
@@ -40,8 +40,9 @@ export function useUrlState() {
   const [selected, setSelected] = useState(initial.selected);
   const [page, setPage]         = useState(initial.page);
   const [cat, setCat]           = useState(initial.cat);
+  const [hq, setHq]             = useState(initial.hq);
 
-  const current = { q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat };
+  const current = { q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat, hq };
 
   // History bookkeeping — push when the navigation key changes (real mode
   // transitions), replace otherwise.
@@ -65,7 +66,7 @@ export function useUrlState() {
       window.history.replaceState({}, '', url);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat]);
+  }, [q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat, hq]);
 
   useEffect(() => {
     const onPop = () => {
@@ -80,6 +81,7 @@ export function useUrlState() {
       setSelected(s.selected);
       setPage(s.page);
       setCat(s.cat);
+      setHq(s.hq);
       prevNavKeyRef.current = navKeyOf(s);
     };
     window.addEventListener('popstate', onPop);
@@ -90,7 +92,7 @@ export function useUrlState() {
   function resetAll() {
     setQ(''); setFz(''); setScode(''); setKeyword('');
     setYearFrom(''); setYearTo('');
-    setSelected(null); setPage(''); setCat('');
+    setSelected(null); setPage(''); setCat(''); setHq('');
   }
 
   /** Prefer browser history (restores prior state); otherwise fall back to a full reset. */
@@ -100,9 +102,9 @@ export function useUrlState() {
   }
 
   return {
-    q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat,
+    q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat, hq,
     setQ, setFz, setScode, setKeyword, setYearFrom, setYearTo,
-    setSelected, setPage, setCat,
+    setSelected, setPage, setCat, setHq,
     resetAll, goBack,
   };
 }

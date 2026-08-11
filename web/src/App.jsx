@@ -107,9 +107,9 @@ export default function App() {
   // ── Search / navigation state (URL-synced) ──────────────────────────
   const url = useUrlState();
   const {
-    q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat,
+    q, fz, scode, keyword, yearFrom, yearTo, selected, page, cat, hq,
     setQ, setFz, setScode, setKeyword, setYearFrom, setYearTo,
-    setSelected, setPage, setCat,
+    setSelected, setPage, setCat, setHq,
     resetAll, goBack,
   } = url;
 
@@ -194,7 +194,9 @@ export default function App() {
 
   const openScodes = () => { setSelected(null); setCat(''); setPage('scodes'); };
   const openVehicles = () => { setSelected(null); setCat(''); setPage('vehicles'); };
-  const openHistory = () => { setSelected(null); setCat(''); setPage('history'); };
+  const openHistory = (filter = '') => {
+    setSelected(null); setCat(''); setHq(filter); setPage('history');
+  };
 
   const selectScodeFilter = (sc) => {
     setPage(''); setCat('');
@@ -289,13 +291,19 @@ export default function App() {
           onHome={resetAll}
           onOpenInfo={openInfo}
           onSelectCode={followReference}
+          onOpenBulletin={(code) => { setPage(''); setSelected(code); }}
+          filter={hq}
+          onChangeFilter={setHq}
         />
         {infoOpen && <InfoModal onClose={closeInfo} />}
       </>
     );
   }
 
-  if (!hasQuery) {
+  // A bulletin can be opened without a search behind it (from the
+  // changelog, or via a ?code= link), so `selected` alone must be enough
+  // to leave the landing page.
+  if (!hasQuery && !selected) {
     return (
       <LandingPage
         status={status}
@@ -347,6 +355,7 @@ export default function App() {
       reload={reload}
       onOpenScodes={openScodes}
       onOpenVehicles={openVehicles}
+      onOpenHistory={openHistory}
       onOpenInfo={openInfo}
       followReference={followReference}
       vehicleLabel={vehicleLabel}
@@ -415,7 +424,7 @@ function LandingPage({
           {status?.features?.history && (
             <>
               {' · '}
-              <button className="linklike" onClick={onOpenHistory}>Änderungen</button>
+              <button className="linklike" onClick={() => onOpenHistory()}>Änderungen</button>
             </>
           )}
           {' · '}
@@ -588,7 +597,7 @@ function GoogleView({
   vehicles, scodes,
   results, loading, detail, qDeb,
   view, setView, theme, toggleTheme,
-  reload, onOpenScodes, onOpenVehicles, onOpenInfo,
+  reload, onOpenScodes, onOpenVehicles, onOpenHistory, onOpenInfo,
   followReference, vehicleLabel,
   infoOpen, closeInfo,
 }) {
@@ -689,6 +698,8 @@ function GoogleView({
           setSelected={setSelected}
           vehicleLabel={vehicleLabel}
           onFollowCode={followReference}
+          onOpenBulletin={setSelected}
+          onOpenHistory={onOpenHistory}
         />
       )}
       {infoOpen && <InfoModal onClose={closeInfo} />}
@@ -701,7 +712,7 @@ function GoogleView({
  * renumbered. Shown instead of the generic "try other terms" tip, because
  * here we know exactly why there is no hit.
  */
-function FormerNotice({ former, onFollowCode }) {
+function FormerNotice({ former, onFollowCode, onOpenBulletin, onOpenHistory }) {
   const when = former.updateAt ? ` (${fmtDateTime(former.updateAt)})` : '';
   return (
     <div className="former-notice">
@@ -718,11 +729,24 @@ function FormerNotice({ former, onFollowCode }) {
       )}
       {former.title && <div className="former-title">{former.title}</div>}
       {former.date && <div className="former-date">Stand der Aktion: {fmtDateTime(former.date)}</div>}
+      <div className="former-actions">
+        {former.hasRecord && (
+          <button className="linklike" onClick={() => onOpenBulletin(former.code)}>
+            Letzten bekannten Stand öffnen
+          </button>
+        )}
+        <button className="linklike" onClick={() => onOpenHistory(former.code)}>
+          In den Änderungen ansehen
+        </button>
+      </div>
     </div>
   );
 }
 
-function ResultsList({ results, loading, qDeb, setSelected, vehicleLabel, onFollowCode }) {
+function ResultsList({
+  results, loading, qDeb, setSelected, vehicleLabel,
+  onFollowCode, onOpenBulletin, onOpenHistory,
+}) {
   return (
     <main className="results-main">
       <div className="results-stats">
@@ -737,7 +761,12 @@ function ResultsList({ results, loading, qDeb, setSelected, vehicleLabel, onFoll
         <div className="no-results">
           Keine Treffer für <strong>{qDeb || 'diese Filter'}</strong>.
           {results.former ? (
-            <FormerNotice former={results.former} onFollowCode={onFollowCode} />
+            <FormerNotice
+              former={results.former}
+              onFollowCode={onFollowCode}
+              onOpenBulletin={onOpenBulletin}
+              onOpenHistory={onOpenHistory}
+            />
           ) : (
             <div style={{ marginTop: 8, fontSize: 13 }}>
               Versuchen Sie andere Begriffe oder entfernen Sie Filter.

@@ -24,12 +24,15 @@ import { fmtDateTime } from '../utils/format';
  *   onHome: () => void,
  *   onOpenInfo: () => void,
  *   onSelectCode: (code: string) => void,
+ *   filter: string,
+ *   onChangeFilter: (v: string) => void,
+ *   onOpenBulletin: (code: string) => void,
  * }} props
  */
 export function HistoryPage({
   history, loading, theme, onToggleTheme, onBack, onHome, onOpenInfo, onSelectCode,
+  filter, onChangeFilter, onOpenBulletin,
 }) {
-  const [filter, setFilter] = useState('');
   const [expanded, setExpanded] = useState(() => new Set());
   const filterLower = filter.toLowerCase().trim();
 
@@ -57,6 +60,15 @@ export function HistoryPage({
       );
   }, [updates, filterLower]);
 
+  /** How many single changes the filter matched, across all updates. */
+  const matchCount = useMemo(
+    () => filtered.reduce(
+      (n, u) => n + u.added.length + u.updated.length + u.removed.length + u.renamed.length,
+      0,
+    ),
+    [filtered],
+  );
+
   const toggle = (seq) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -71,13 +83,21 @@ export function HistoryPage({
         <li key={kind + e.code + (e.from || '')}>
           <button
             className="hist-code"
-            onClick={() => onSelectCode(e.code)}
-            title={kind === 'removed' ? 'Nach diesem Code suchen (zurückgezogen)' : 'Nach diesem Code suchen'}
+            onClick={() => onOpenBulletin(e.code)}
+            title={kind === 'removed'
+              ? 'Zurückgezogene Aktion im letzten bekannten Stand öffnen'
+              : 'Aktion öffnen'}
           >
             {e.code}
           </button>
           {kind === 'renamed' && e.from && (
-            <span className="hist-from">vorher {e.from}</span>
+            <button
+              className="hist-from"
+              onClick={() => onSelectCode(e.from)}
+              title={`Nach dem alten Code ${e.from} suchen`}
+            >
+              vorher {e.from}
+            </button>
           )}
           <span className="hist-title">{e.title || <em>(ohne Bezeichnung)</em>}</span>
           {e.date && <span className="hist-date">{fmtDateTime(e.date)}</span>}
@@ -106,16 +126,7 @@ export function HistoryPage({
             <span className="logo-accent">neo-KIAS</span>
             <VersionBadge small />
           </div>
-          <div className="top-search scodes-filter-search">
-            <SearchIcon />
-            <input
-              value={filter}
-              onChange={e => setFilter(e.target.value)}
-              placeholder="Aktionscode, Bezeichnung oder Update filtern…"
-              autoFocus
-            />
-            {filter && <button className="clear-btn" onClick={() => setFilter('')} aria-label="Leeren">×</button>}
-          </div>
+          <div className="hist-head-title">Änderungen</div>
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           <button className="info-btn" onClick={onOpenInfo} title="Über neo-KIAS" aria-label="Info">i</button>
         </div>
@@ -129,6 +140,26 @@ export function HistoryPage({
             aufgenommene, geänderte, umnummerierte und zurückgezogene Aktionen,
             je Update-Datei und mit dem Zeitraum, den sie abdeckt.
           </p>
+
+          <div className="hist-search">
+            <SearchIcon />
+            <input
+              value={filter}
+              onChange={e => onChangeFilter(e.target.value)}
+              placeholder="Änderungen durchsuchen – Aktionscode oder Bezeichnung, z. B. 25SC4"
+              autoFocus
+            />
+            {filter && (
+              <button className="clear-btn" onClick={() => onChangeFilter('')} aria-label="Leeren">×</button>
+            )}
+          </div>
+          {filterLower && (
+            <div className="hist-search-hint">
+              {matchCount === 0
+                ? <>Keine Änderung enthält <strong>{filter}</strong>.</>
+                : <>{matchCount.toLocaleString()} {matchCount === 1 ? 'Änderung' : 'Änderungen'} in {filtered.length} {filtered.length === 1 ? 'Update' : 'Updates'} gefunden.</>}
+            </div>
+          )}
           {totals && (
             <div className="scodes-stats">
               {totals.updates.toLocaleString()} Updates ·{' '}

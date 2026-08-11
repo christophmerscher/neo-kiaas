@@ -14,7 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `FO_Up.DBF`. Erreichbar über die Fußzeile der Startseite, filterbar,
   ein Klick auf einen Code sucht danach.
 - Sucht man einen Aktionscode, den ein Update zurückgezogen oder
-  umnummeriert hat, sagt die Trefferliste das jetzt, statt leer zu bleiben.
+  umnummeriert hat, sagt die Trefferliste das jetzt, statt leer zu bleiben,
+  und verlinkt auf den letzten bekannten Stand sowie auf die Änderungen.
+- Zurückgezogene Aktionen lassen sich weiterhin vollständig öffnen. Der
+  letzte bekannte Datensatz wird mitsamt Memo-Feldern aufgehoben, sonst
+  ginge der eigentliche Text verloren: `K_BEZEICH` ist im KIAS-Schema auf
+  90 Zeichen begrenzt, der vollständige Wortlaut steht in `BESCHREIB`.
+  Kostet rund 2,3 MB für die derzeit 525 betroffenen Sätze.
+- Die Änderungen-Seite hat ein eigenes, breites Suchfeld statt des
+  schmalen Filters in der Kopfzeile. Der Suchbegriff steht in der URL
+  (`?page=history&hq=25SC4`), ist also teilbar, und die Seite meldet, wie
+  viele Änderungen in wie vielen Updates gefunden wurden.
 - `GET /api/history` liefert dieselben Daten als JSON.
 - `KIAS_HISTORY` (Default `true`) schaltet das Mitschreiben ab; dann
   verschwinden Seite, Fußzeilen-Link und Hinweis.
