@@ -1,11 +1,11 @@
 # neo-KIAS Explorer
 
-Moderne Weboberfläche zum Durchsuchen einer lokal vorliegenden KIAS-Datenbank
-(Ford Service-Informationen). Die Anwendung liest die DBF-Dateien direkt,
+Moderne Weboberfläche zum Durchsuchen einer lokal vorliegenden KIAS Datenbank
+(Ford Service Informationen). Die Anwendung liest die DBF Dateien direkt,
 verändert sie nicht und braucht keinen Datenbankserver.
 
 **Inoffizielle Erweiterung, nicht von Ford.** neo-KIAS ist eine unabhängige
-Drittanbieter-Anwendung und steht in keiner Verbindung zu Ford, der Ford-Werke
+Drittanbieteranwendung und steht in keiner Verbindung zu Ford, der Ford Werke
 GmbH oder einem ihrer Tochterunternehmen, Partner oder Lieferanten.
 Markennamen sind Eigentum der jeweiligen Rechteinhaber.
 
@@ -30,16 +30,16 @@ Lizenztext siehe [`LICENSE`](./LICENSE).
 
 ## Voraussetzung: das Datenverzeichnis
 
-Beide Startvarianten brauchen ein Verzeichnis, das die KIAS-Daten enthält:
+Beide Startvarianten brauchen ein Verzeichnis, das die KIAS Daten enthält:
 
 ```
 Kias/
 ├── Daten/       Basisdatenbank (FO_AKTION.DBF etc.)
 ├── Update/      Update-Dateien (FO_UA*.dbf, FO_UAF*.dbf, …)
-└── Formulare/   PDF- und Office-Anhänge
+└── Formulare/   PDF und Office Anhänge
 ```
 
-Beim Start werden die Basisdateien gelesen und anschließend alle Update-Dateien
+Beim Start werden die Basisdateien gelesen und anschließend alle update Dateien
 der Reihe nach angewendet. Das dauert je nach Datenträger einige Sekunden bis
 gut eine Minute; solange zeigt die Oberfläche einen Ladebildschirm.
 
@@ -81,10 +81,6 @@ docker compose logs -f
 docker compose down
 ```
 
-Nach Codeänderungen erneut mit `--build` starten, sonst läuft der alte Stand
-weiter. Das Datenverzeichnis wird schreibgeschützt nach `/data` gemountet, die
-Anwendung kann die KIAS-Daten also nicht verändern.
-
 ## Starten mit npm
 
 Voraussetzung ist Node.js 20 oder neuer.
@@ -119,15 +115,6 @@ $env:KIAS_ROOT = "C:\Users\me\Kias"; npm start
 Zeigt die Datenwurzel ins Leere, meldet der Start eine Fehlerzeile im Log und
 `/api/status` liefert `rootOk: false`, statt eine leere Datenbank vorzutäuschen.
 
-Für die Entwicklung mit Hot-Reload zwei Terminals:
-
-```bash
-npm run dev:server
-```
-
-```bash
-npm run dev:web
-```
 
 Vite läuft dann auf http://localhost:5173 und leitet `/api` an Port 5175 weiter.
 
@@ -142,8 +129,8 @@ Vorrang vor der Datei.
 
 | Variable | Default | Beschreibung |
 |---|---|---|
-| `KIAS_DATA_DIR` | – | **Pflicht.** Absoluter Pfad zum Verzeichnis mit `Daten/`, `Update/` und `Formulare/`. Bei Docker der Host-Pfad für den Mount, bei npm die Datenwurzel. |
-| `KIAS_ROOT` | eine Ebene über der App | Datenwurzel der Anwendung. Im Container setzt Compose sie auf `/data`. Nur nötig, wenn sie von `KIAS_DATA_DIR` abweichen soll. |
+| `KIAS_DATA_DIR` | – | **Pflicht.** Absoluter Pfad zum Verzeichnis mit `Daten/`, `Update/` und `Formulare/`. Bei Docker der Host Pfad für den Mount, bei npm die Datenwurzel. |
+| `KIAS_ROOT` | eine Ebene über der App | Datenwurzel der Anwendung. Im Container setzt compose sie auf `/data`. Nur nötig, wenn sie von `KIAS_DATA_DIR` abweichen soll. |
 | `HOST_PORT` | `5175` | Port auf dem Host (nur Docker). |
 | `TZ` | `Europe/Berlin` | Zeitzone im Container. |
 
@@ -154,13 +141,10 @@ und `KIAS_DATA_DIR` auf den Mountpoint gesetzt.
 
 | Variable | Default | Beschreibung |
 |---|---|---|
-| `KIAS_SEARCH_BLOBS` | `true` | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird 2- bis 4-mal schneller, kostet aber rund 100 MB Arbeitsspeicher. |
-| `KIAS_SEARCH_CACHE` | `50` | Anzahl der Filterkombinationen, deren Trefferliste im Speicher bleibt. Wiederholte Suchen und das Blättern werden daraus bedient, in unter einer Millisekunde. Wird bei jedem Reload verworfen. |
-| `KIAS_HISTORY` | `true` | Änderungshistorie der Updates mitschreiben. Schaltet die Seite **Änderungen** frei und erklärt bei der Suche nach einem nicht mehr vorhandenen Aktionscode, was mit ihm passiert ist. Kostet etwa eine halbe Sekunde Ladezeit und wenige MB. |
+| `KIAS_SEARCH_BLOBS` | `true` | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird schneller. |
+| `KIAS_SEARCH_CACHE` | `50` | Anzahl der Filterkombinationen, deren Trefferliste im Speicher bleibt. Wiederholte Suchen und das Blättern werden daraus bedient. Wird bei jedem Reload verworfen. |
+| `KIAS_HISTORY` | `true` | Änderungshistorie der Updates mitschreiben. Schaltet die Seite **Änderungen** frei und erklärt bei der Suche nach einem nicht mehr vorhandenen Aktionscode, was mit ihm passiert ist. |
 
-Anhaltspunkt beim Referenzdatenstand (rund 12.200 Aktionen, 220.000
-Fahrzeug-Verknüpfungen): mit Blobs etwa 400 MB Speicher und 25 bis 90 ms je
-neuer Suche, ohne Blobs etwa 300 MB und 100 bis 160 ms.
 
 ### Bilder
 
@@ -173,19 +157,19 @@ neuer Suche, ohne Blobs etwa 300 MB und 100 bis 160 ms.
 
 | Variable | Default | Beschreibung |
 |---|---|---|
-| `KIAS_LOG_DIR` | `./logs` | Host-Pfad für die Logdateien. Unter Linux werden Schreibrechte für uid 1000 benötigt (`sudo chown 1000:1000 ./logs`). |
+| `KIAS_LOG_DIR` | `./logs` | Host Pfad für die Logdateien. Unter Linux werden Schreibrechte für uid 1000 benötigt (`sudo chown 1000:1000 ./logs`). |
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug` oder `trace`. Ab `debug` werden auch Suchfilter protokolliert. |
 | `LOG_MAX_SIZE` | `10m` | Rotation ab dieser Dateigröße. |
-| `LOG_FREQUENCY` | `daily` | `daily`, `hourly` oder Millisekunden. Rotiert wird nach der zuerst zutreffenden Regel. |
+| `LOG_FREQUENCY` | `daily` | `daily`, `hourly`. Rotiert wird nach der zuerst zutreffenden Regel. |
 | `LOG_MAX_FILES` | `14` | Anzahl der aufbewahrten Dateien. |
 | `LOG_STDOUT` | `true` | `false` schaltet die Ausgabe in `docker compose logs` ab. |
 
-Die Anwendung schreibt strukturierte JSON-Logs, eine Zeile je HTTP-Anfrage,
+Die Anwendung schreibt strukturierte JSON Logs, eine Zeile je HTTP-Anfrage,
 inklusive aufrufender IP und Antwortzeit.
 
 ## Updates einspielen
 
-Neue Update-Dateien in den Ordner `Update/` kopieren. Bei Docker sind sie durch
+Neue Update Dateien in den Ordner `Update/` kopieren. Bei Docker sind sie durch
 das Volume sofort im Container sichtbar. Danach die Daten neu einlesen:
 
 - Knopf **„neu einlesen"** in der Fußzeile der Startseite, oder
@@ -212,7 +196,7 @@ den Grund, statt leer zu bleiben:
 > zurückgezogen und ist deshalb nicht mehr im Bestand.
 
 Der letzte bekannte Stand lässt sich weiterhin vollständig öffnen.
-Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` →
+Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` ->
 `WN003/26`).
 
 ## API
