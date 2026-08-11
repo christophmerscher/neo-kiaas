@@ -1,28 +1,21 @@
-# docker-compose.yml — neo-KIAS local deployment
+# docker-compose.yml — neo-KIAS
 #
-# Configuration comes from a sibling .env file. Copy .env.example to .env
-# and edit KIAS_DATA_DIR to point at the folder that contains the
-# Daten/, Update/, and Formulare/ subdirectories.
+# The image is always built from the sources in this repository; there is
+# no pre-built image to pull. Configuration comes from a sibling .env file:
+# copy .env.example to .env and point KIAS_DATA_DIR at the folder holding
+# the Daten/, Update/ and Formulare/ subdirectories.
 #
-# By default this pulls a pre-built image from GitHub Container Registry:
-#     ghcr.io/christophmerscher/neo-kiaas:<tag>
-# Override the image (e.g. for forks or development) via NEO_KIAS_IMAGE
-# in .env. To build locally instead of pulling, run:
-#     docker compose build
-#     docker compose up -d
-
+#     docker compose up -d --build
+#
 services:
   neo-kias:
-    image: "${NEO_KIAS_IMAGE:-ghcr.io/christophmerscher/neo-kiaas}:${IMAGE_TAG:-latest}"
-    # `build` is kept so contributors can `docker compose build` to produce
-    # a local image with the same coordinates. End users who only pull from
-    # GHCR can ignore this — it's a no-op without `--build`.
     build:
       context: .
       dockerfile: Dockerfile
+    # Local tag for the image built above. Nothing is pulled from a registry.
+    image: neo-kias:local
     container_name: neo-kias
     restart: unless-stopped
-    pull_policy: missing
 
     # Web UI + JSON API. Override the host-side port via HOST_PORT in .env.
     ports:

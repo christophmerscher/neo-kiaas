@@ -1,342 +1,23 @@
 # neo-KIAS Explorer
 
-**Inoffizielle Erweiterung, nicht von Ford.**
-> neo-KIAS ist eine unabhängige Drittanbieter-Anwendung und steht in keiner Verbindung
-> zu Ford, der Ford-Werke GmbH oder einem ihrer Tochterunternehmen, Partner oder
-> Lieferanten. Markennamen sind Eigentum der jeweiligen Rechteinhaber.
-
 Moderne Weboberfläche zum Durchsuchen einer lokal vorliegenden KIAS-Datenbank
-(Ford Service-Informationen).
-
-## Schnellstart (Docker, vorgefertigtes Image)
-
-```bash
-# 1) Wenige Dateien herunterladen
-curl -O https://raw.githubusercontent.com/christophmerscher/neo-kias/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/christophmerscher/neo-kias/main/.env.example
-
-# 2) .env anlegen und KIAS_DATA_DIR anpassen
-cp .env.example .env
-# in .env:
-#   NEO_KIAS_IMAGE=ghcr.io/christophmerscher/neo-kias
-#   IMAGE_TAG=latest         # oder z. B. 1.1.0-alpha für Pinning
-#   KIAS_DATA_DIR=/pfad/zum/Kias
-
-# 3) Image holen und starten
-docker compose pull
-docker compose up -d
-
-# 4) UI öffnen → http://localhost:5175
-```
-
-## Image-Tags
-
-TBD
-
-## Architektur
-
-TBD
-
-## Setup
-
-```bash
-cd kias-web
-npm install
-npm run install:web
-npm run build:web
-```
-
-## Starten
-
-```bash
-npm start
-# öffnet http://localhost:5175
-```
-
-Die Anwendung lädt beim Start alle Dateien aus `../Daten` und wendet danach alle
-Update-Dateien aus `../Update` der Reihe nach an (Insert/Update/Delete nach `UPAKTION`).
-
-Ohne weitere Angabe sucht die Anwendung die Daten also **eine Ebene über dem
-Anwendungsverzeichnis**. Liegt das Repository woanders als die KIAS-Installation
-(typisch bei Entwicklung), gibt es zwei Wege:
-
-```bash
-# einmalig für diese Shell
-$env:KIAS_ROOT = "C:\Users\me\Kias"; npm start
-```
-
-oder dauerhaft über die `.env` im Anwendungsverzeichnis, die auch ohne Docker
-gelesen wird (`KIAS_ROOT`, ersatzweise `KIAS_DATA_DIR`). Zeigt die Datenwurzel
-ins Leere, meldet der Start eine Fehlerzeile im Log und `/api/status` liefert
-`rootOk: false`, statt eine leere Datenbank vorzutäuschen.
-
-## Updates einspielen
-
-Wenn neue Updatedaateien im `Update/`-Ordner landen:
-
-- Entweder den Button **„Neu laden"** oben rechts klicken
-- Oder `curl -X POST http://localhost:5175/api/reload`
-- Oder den Server neu starten
-
-## Deployment mit Docker
-
-Die Anwendung kann komplett in einem Docker Container betrieben werden. Das Datenbank Verzeichnis wird per Volume gemountet, die Anwendung selbst weiß nicht, ob die Daten lokal, auf einem NAS oder auf einer Netzwerkfreigabe liegen.
-
-### Setup
-
-```bash
-# 1) .env anlegen und KIAS_DATA_DIR anpassen
-cp .env.example .env
-# bearbeite .env: KIAS_DATA_DIR=<absoluter Pfad zu deinem Kias-Ordner>
-
-# 2) Image bauen und starten
-docker compose up -d --build
-
-# 3) UI öffnen
-#    → http://localhost:5175
-```
-
-### Konfiguration (`.env`)
-
-| Variable        | Pflicht | Beschreibung                                                                 |
-|-----------------|:-------:|------------------------------------------------------------------------------|
-| `KIAS_DATA_DIR` | ✅      | Absoluter Pfad zum Verzeichnis, das `Daten/`, `Update/` und `Formulare/` enthält. Kann ein lokaler Pfad oder ein bereits gemounteter Netzwerkpfad sein. |
-| `HOST_PORT`     | –       | Port auf dem Host (Default `5175`).                                          |
-| `TZ`            | –       | Zeitzone im Container (Default `Europe/Berlin`).                             |
-
-Innerhalb des Containers wird das Datenverzeichnis readonly nach `/data`
-gemountet; die Variable `KIAS_ROOT=/data` weist die Anwendung dort hinein.
-
-#### Suche und Speicherbedarf
-
-| Variable            | Default | Beschreibung |
-|---------------------|---------|--------------|
-| `KIAS_SEARCH_BLOBS` | `true`  | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird dadurch rund 2- bis 4-mal schneller, der Prozess braucht aber etwa 100 MB mehr Arbeitsspeicher. |
-| `KIAS_SEARCH_CACHE` | `50`    | Anzahl der Filterkombinationen, deren Trefferliste im Speicher gehalten wird. Wiederholte Suchen und das Blättern durch eine Trefferliste werden daraus bedient, also in unter einer Millisekunde. Der Cache wird bei jedem Reload verworfen. |
-| `KIAS_HISTORY` | `true` | Änderungshistorie der Updates mitschreiben. Schaltet die Seite **Änderungen** frei und blendet bei einer Suche nach einem nicht mehr vorhandenen Aktionscode ein, was mit ihm passiert ist. Kostet rund eine halbe Sekunde Ladezeit und wenige hundert KB. Auf `false` verschwinden Seite und Fußzeilen-Link. |
-
-Grober Anhaltspunkt auf dem Referenzdatenstand (rund 12.200 Aktionen,
-220.000 Fahrzeug-Verknüpfungen): mit Blobs rund 400 MB RSS und 25 bis 90 ms je
-neuer Suche, ohne Blobs rund 300 MB RSS und 100 bis 160 ms. Die Zähler
-unter `searchCache` in `/api/status` zeigen, wie oft der Cache greift.
-
-
-### Netzwerkfreigaben (SMB / NFS)
-
-Mount auf dem Host vornehmen, anschließend in `.env` den Mountpoint angeben:
-
-```bash
-# Beispiel Linux/SMB
-sudo mount -t cifs //fileserver/kias-share /mnt/kias \
-  -o username=USER,password=PASS,uid=1000,gid=1000
-
-# In .env:
-KIAS_DATA_DIR=/mnt/kias
-```
-
-Alternativ kann Compose das Volume selbst mounten, dafür `volumes:` im
-`docker-compose.yml` um eine Definition mit `driver_opts` erweitern. Für die
-meisten Setups ist „auf dem Host mounten" aber der robustere Weg.
-
-### Updates einspielen (Docker-Variante)
-
-Neue Update-Dateien einfach in den `Update/`-Ordner auf dem Host kopieren dank Volume sind sie sofort im Container sichtbar. Daten neu einlesen:
-
-```bash
-curl -X POST http://localhost:5175/api/reload
-```
-
-oder den Button **„neu einlesen"** in der UI klicken.
-
-### Logs und Healthcheck
-
-Die Anwendung schreibt strukturierte JSON Logs sowohl auf `stdout` (sichtbar
-in `docker compose logs`) als auch in rotierte Dateien im Volume `/logs`,
-das auf das Host-Verzeichnis `${KIAS_LOG_DIR}` (Default `./logs`) gemountet
-wird.
-
-```bash
-docker compose logs -f neo-kias       # Live-Logs (Stdout)
-ls -lh ./logs                         # Rotierte Dateien auf dem Host
-tail -f ./logs/neo-kias.log           # aktive Logdatei
-docker compose ps                     # Healthcheck-Status
-```
-
-#### Konfigurierbare Log-Variablen in `.env`
-
-| Variable          | Default       | Beschreibung |
-|-------------------|---------------|--------------|
-| `KIAS_LOG_DIR`    | `./logs`      | Host-Pfad für Logdateien. Schreibrechte für uid 1000 nötig. |
-| `LOG_LEVEL`       | `info`        | `fatal` / `error` / `warn` / `info` / `debug` / `trace`. |
-| `LOG_MAX_SIZE`    | `10m`         | Rotation bei dieser Dateigröße (z. B. `5m`, `100m`, `1k`). |
-| `LOG_FREQUENCY`   | `daily`       | `daily`, `hourly` oder Millisekunden. |
-| `LOG_MAX_FILES`   | `14`          | Anzahl historischer Dateien, die behalten werden. Ältere werden gelöscht. |
-| `LOG_STDOUT`      | `true`        | `false` schaltet `docker logs` ab, wenn nur Dateien gewünscht sind. |
-
-Rotation erfolgt **nach erster zutreffender Regel**, d. h. eine neue Datei
-wird sowohl bei Tageswechsel als auch bei Erreichen der Maximalgröße begonnen.
-
-#### Inhalt der Logs
-
-Jeder HTTP-Request wird als eigene Zeile mit folgenden Feldern erfasst:
-
-```json
-{
-  "level": "info",
-  "time": "2026-05-12T14:23:01.847Z",
-  "app": "neo-kias",
-  "req": {
-    "method": "GET",
-    "url": "/api/bulletin/2436%2F10",
-    "remoteIp": "192.168.1.42",
-    "forwardedFor": "203.0.113.7",
-    "userAgent": "Mozilla/5.0 ...",
-    "referer": "http://localhost:5175/"
-  },
-  "res": { "statusCode": 200 },
-  "responseTime": 4,
-  "msg": "192.168.1.42 GET /api/bulletin/2436%2F10 -> 200"
-}
-```
-
-Auf Level `debug` werden zusätzlich die Suchfilter und aufgelösten
-Bulletin-Codes geloggt, sodass nachvollziehbar ist, wer wonach gesucht hat.
-`forwardedFor` füllt sich nur, wenn neo-KIAS hinter einem Reverse Proxy
-läuft (Header `X-Forwarded-For`).
-
-#### Volumes-Berechtigungen
-
-Der Container läuft als unprivilegierter User `node` (uid 1000). Wenn das
-Hostverzeichnis nicht beschreibbar ist, startet die Anwendung trotzdem,
-fällt aber stillschweigend auf Stdout-Logging zurück (siehe `docker logs`).
-Korrekte Berechtigungen einrichten:
-
-```bash
-# Linux / macOS
-mkdir -p ./logs && sudo chown 1000:1000 ./logs
-
-# Windows (Docker Desktop): Logs liegen unter %USERPROFILE%, das normalerweise
-# uneingeschränkt schreibbar ist — kein chown nötig.
-```
-
-Healthcheck: wartet bis zu 2 Minuten auf das Laden der Daten und gilt
-anschließend als healthy, sobald `/api/status` `"loaded":true` meldet.
-
-## Entwicklung (Hot-Reload)
-
-Zwei Terminals:
-
-```bash
-# Terminal 1 – API-Server
-npm run dev:server
-
-# Terminal 2 – Vite (http://localhost:5173, /api wird zu 5175 geproxyt)
-npm run dev:web
-```
-
-## Änderungen (Update-Historie)
-
-KIAS liefert seine Daten als Basisstand plus eine nummerierte Kette von
-Update-Dateien. Beim Zusammenführen entsteht der aktuelle Stand, und die
-Zwischenschritte gehen verloren: eine Aktion, die ein Update aufnimmt und
-ein späteres zurückzieht, ist danach spurlos verschwunden.
-
-Die Seite **Änderungen** (Link in der Fußzeile der Startseite) hält diesen
-Verlauf fest. Je Update-Datei steht dort, was neu kam, was geändert wurde,
-was eine neue Nummer bekam und was zurückgezogen wurde, jeweils mit dem
-Zeitraum aus `FO_Up.DBF`. Ein Klick auf einen Code sucht danach.
-
-Sucht man einen Aktionscode, den es nicht mehr gibt, erklärt die
-Trefferliste den Grund, statt leer zu bleiben:
-
-> **25SC4** gab es, wurde aber mit Update 007 / 2026 (30.04.2026)
-> zurückgezogen und ist deshalb nicht mehr im Bestand.
-
-Umnummerierte Aktionen verweisen auf ihren neuen Code
-(`WN003/2026` → `WN003/26`).
-
-Zurückgezogene Aktionen bleiben vollständig lesbar: neo-KIAS hebt ihren
-letzten bekannten Datensatz auf und zeigt ihn in der gewohnten
-Detailansicht, mit einem Hinweis darauf, dass die Aktion nicht mehr im
-Bestand ist. Das ist nötig, weil `K_BEZEICH` im KIAS-Schema nur 90 Zeichen
-fasst und der eigentliche Text im Memo-Feld `BESCHREIB` steht, das mit dem
-Datensatz verschwinden würde. Verknüpfte Fahrzeuge und Symptomcodes sind
-mit derselben Update-Datei entfallen und daher leer.
-
-## API-Endpoints
-
-- `GET  /api/status` – Ladewtatus & Zähler
-- `POST /api/reload` – Daten neu einlesen
-- `GET  /api/bulletins?q=&fz=&scode=&keyword=&yearFrom=&yearTo=&limit=&offset=`
-- `GET  /api/bulletin/:code` – Volltext inkl. verknüpfter Daten
-- `GET  /api/vehicles`, `GET /api/scodes`, `GET /api/updates`
-- `GET  /api/history` – Änderungen je Update-Datei (leer, wenn `KIAS_HISTORY=false`)
-- `GET  /api/forms/:file` – Formular PDF ausliefern
-
-## Release-Prozess (für Maintainer)
-
-Neue Versionen werden über Git-Tags veröffentlicht. Der CI-Workflow (siehe
-`.github/workflows/docker.yml`) baut das Image automatisch und publiziert
-es nach GHCR mit semantischer Tag-Logik.
-
-```bash
-# 1) Versionsnummer in package.json hochziehen
-#    (z. B. 1.0.0-alpha → 1.0.0-beta)
-
-# 2) Commit + Push auf main
-git add package.json web/src/App.jsx
-git commit -m "release: bump to 1.0.0-beta"
-git push origin main
-
-# 3) Tag setzen und pushen
-git tag v1.0.0-beta
-git push origin v1.0.0-beta
-```
-
-Was dann automatisch passiert:
-
-- GHA-Workflow startet beim Tag-Push (`v*.*.*`).
-- Image wird für `linux/amd64` und `linux/arm64` gebaut.
-- Tags werden gesetzt: `1.0.0-beta`, `1.0`, `1`, plus `latest` (nur für
-  stabile Releases; Pre-Releases wie `-alpha`/`-beta`/`-rc` aktualisieren
-  `latest` **nicht**).
-- Provenance-Attestation wird mit veröffentlicht.
-
-## Build aus Quellcode
-
-Falls man das Image lokal bauen (statt aus GHCR ziehen) möchte:
-
-```bash
-# Auschecken
-git clone https://github.com/christophmerschher/neo-kiaas.git
-cd neo-kiaas
-
-# Image lokal bauen
-docker compose build
-
-# Mit gleicher .env starten
-docker compose up -d
-```
-
-## Fork
-
-Bei einem Fork:
-
-1. Repo forken auf GitHub.
-2. In `.env`:  `NEO_KIAS_IMAGE=ghcr.io/<dein-fork>/neo-kias`
-3. Push nach `main` -> der eigene CI-Workflow baut und published nach dem
-   eigenen GHCR-Namespace.
-4. Package-Visibility ggf. auf "Public" stellen (siehe oben).
-
-## Lizenz & Haftungsausschluss
+(Ford Service-Informationen). Die Anwendung liest die DBF-Dateien direkt,
+verändert sie nicht und braucht keinen Datenbankserver.
+
+**Inoffizielle Erweiterung, nicht von Ford.** neo-KIAS ist eine unabhängige
+Drittanbieter-Anwendung und steht in keiner Verbindung zu Ford, der Ford-Werke
+GmbH oder einem ihrer Tochterunternehmen, Partner oder Lieferanten.
+Markennamen sind Eigentum der jeweiligen Rechteinhaber.
+
+## Lizenz und Haftungsausschluss
 
 Veröffentlicht unter der [MIT-Lizenz](./LICENSE).
 
-**Diese Software wird ohne jegliche Gewährleistung bereitgestellt.** Die Nutzung
-erfolgt vollständig auf eigene Gefahr. In keinem Fall haften die Autoren für
-direkte, indirekte, zufällige, besondere oder Folgeschäden, die aus der Nutzung
-oder Unmöglichkeit der Nutzung dieser Software entstehen – einschließlich, aber
-nicht beschränkt auf:
+**Diese Software wird ohne jegliche Gewährleistung bereitgestellt.** Die
+Nutzung erfolgt vollständig auf eigene Gefahr. In keinem Fall haften die
+Autoren für direkte, indirekte, zufällige, besondere oder Folgeschäden, die aus
+der Nutzung oder der Unmöglichkeit der Nutzung dieser Software entstehen,
+einschließlich, aber nicht beschränkt auf:
 
 - Fehlinterpretation von Daten
 - Fehlerhafte Reparaturen oder Diagnosen
@@ -344,5 +25,202 @@ nicht beschränkt auf:
 - Finanzielle Verluste
 - Rechtliche Konsequenzen
 
-Maßgeblich sind stets die offiziellen Hersteller­unterlagen. Vollständiger
+Maßgeblich sind stets die offiziellen Herstellerunterlagen. Vollständiger
 Lizenztext siehe [`LICENSE`](./LICENSE).
+
+## Voraussetzung: das Datenverzeichnis
+
+Beide Startvarianten brauchen ein Verzeichnis, das die KIAS-Daten enthält:
+
+```
+Kias/
+├── Daten/       Basisdatenbank (FO_AKTION.DBF etc.)
+├── Update/      Update-Dateien (FO_UA*.dbf, FO_UAF*.dbf, …)
+└── Formulare/   PDF- und Office-Anhänge
+```
+
+Beim Start werden die Basisdateien gelesen und anschließend alle Update-Dateien
+der Reihe nach angewendet. Das dauert je nach Datenträger einige Sekunden bis
+gut eine Minute; solange zeigt die Oberfläche einen Ladebildschirm.
+
+## Starten mit Docker
+
+Es gibt kein vorgefertigtes Image, gebaut wird immer aus diesem Repository.
+Voraussetzung ist Docker mit Compose.
+
+```bash
+git clone https://github.com/christophmerscher/neo-kiaas.git
+```
+
+Danach im Projektverzeichnis die Konfiguration anlegen und `KIAS_DATA_DIR` auf
+den Ordner von oben zeigen lassen:
+
+```bash
+cp .env.example .env
+```
+
+Bauen und starten:
+
+```bash
+docker compose up -d --build
+```
+
+Die Oberfläche läuft dann auf **http://localhost:5175**.
+
+Weitere Befehle:
+
+```bash
+docker compose ps
+```
+
+```bash
+docker compose logs -f
+```
+
+```bash
+docker compose down
+```
+
+Nach Codeänderungen erneut mit `--build` starten, sonst läuft der alte Stand
+weiter. Das Datenverzeichnis wird schreibgeschützt nach `/data` gemountet, die
+Anwendung kann die KIAS-Daten also nicht verändern.
+
+## Starten mit npm
+
+Voraussetzung ist Node.js 20 oder neuer.
+
+```bash
+npm install
+```
+
+```bash
+npm run install:web
+```
+
+```bash
+npm run build:web
+```
+
+```bash
+npm start
+```
+
+Auch hier läuft die Oberfläche auf **http://localhost:5175**.
+
+Ohne weitere Angabe sucht die Anwendung die Daten **eine Ebene über dem
+Anwendungsverzeichnis**. Liegt das Repository woanders als die KIAS-Installation,
+was bei der Entwicklung der Normalfall ist, setzt man den Pfad entweder in der
+`.env` (`KIAS_ROOT`, ersatzweise `KIAS_DATA_DIR`) oder einmalig in der Shell:
+
+```bash
+$env:KIAS_ROOT = "C:\Users\me\Kias"; npm start
+```
+
+Zeigt die Datenwurzel ins Leere, meldet der Start eine Fehlerzeile im Log und
+`/api/status` liefert `rootOk: false`, statt eine leere Datenbank vorzutäuschen.
+
+Für die Entwicklung mit Hot-Reload zwei Terminals:
+
+```bash
+npm run dev:server
+```
+
+```bash
+npm run dev:web
+```
+
+Vite läuft dann auf http://localhost:5173 und leitet `/api` an Port 5175 weiter.
+
+## Konfiguration
+
+Alles wird über die `.env` im Projektverzeichnis gesteuert. Sie gilt für beide
+Startvarianten: Docker reicht die Werte in den Container, beim Start über npm
+liest die Anwendung die Datei selbst. Echte Umgebungsvariablen haben immer
+Vorrang vor der Datei.
+
+### Daten und Netzwerk
+
+| Variable | Default | Beschreibung |
+|---|---|---|
+| `KIAS_DATA_DIR` | – | **Pflicht.** Absoluter Pfad zum Verzeichnis mit `Daten/`, `Update/` und `Formulare/`. Bei Docker der Host-Pfad für den Mount, bei npm die Datenwurzel. |
+| `KIAS_ROOT` | eine Ebene über der App | Datenwurzel der Anwendung. Im Container setzt Compose sie auf `/data`. Nur nötig, wenn sie von `KIAS_DATA_DIR` abweichen soll. |
+| `HOST_PORT` | `5175` | Port auf dem Host (nur Docker). |
+| `TZ` | `Europe/Berlin` | Zeitzone im Container. |
+
+Liegen die Daten auf einer Netzwerkfreigabe, wird diese auf dem Host gemountet
+und `KIAS_DATA_DIR` auf den Mountpoint gesetzt.
+
+### Suche und Speicherbedarf
+
+| Variable | Default | Beschreibung |
+|---|---|---|
+| `KIAS_SEARCH_BLOBS` | `true` | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird 2- bis 4-mal schneller, kostet aber rund 100 MB Arbeitsspeicher. |
+| `KIAS_SEARCH_CACHE` | `50` | Anzahl der Filterkombinationen, deren Trefferliste im Speicher bleibt. Wiederholte Suchen und das Blättern werden daraus bedient, in unter einer Millisekunde. Wird bei jedem Reload verworfen. |
+| `KIAS_HISTORY` | `true` | Änderungshistorie der Updates mitschreiben. Schaltet die Seite **Änderungen** frei und erklärt bei der Suche nach einem nicht mehr vorhandenen Aktionscode, was mit ihm passiert ist. Kostet etwa eine halbe Sekunde Ladezeit und wenige MB. |
+
+Anhaltspunkt beim Referenzdatenstand (rund 12.200 Aktionen, 220.000
+Fahrzeug-Verknüpfungen): mit Blobs etwa 400 MB Speicher und 25 bis 90 ms je
+neuer Suche, ohne Blobs etwa 300 MB und 100 bis 160 ms.
+
+### Bilder
+
+| Variable | Default | Beschreibung |
+|---|---|---|
+| `KIAS_SHOW_CAR_IMAGES` | `false` | Fotobereich auf den Fahrzeugkarten einschalten. Ohne passendes Bild erscheint eine generische Silhouette. |
+| `KIAS_CAR_IMAGES_DIR` | `./car-images` | Verzeichnis mit den Fahrzeugfotos. Dateiname ist der kleingeschriebene Modellname, etwa `mondeo.png`. |
+
+### Logging
+
+| Variable | Default | Beschreibung |
+|---|---|---|
+| `KIAS_LOG_DIR` | `./logs` | Host-Pfad für die Logdateien. Unter Linux werden Schreibrechte für uid 1000 benötigt (`sudo chown 1000:1000 ./logs`). |
+| `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug` oder `trace`. Ab `debug` werden auch Suchfilter protokolliert. |
+| `LOG_MAX_SIZE` | `10m` | Rotation ab dieser Dateigröße. |
+| `LOG_FREQUENCY` | `daily` | `daily`, `hourly` oder Millisekunden. Rotiert wird nach der zuerst zutreffenden Regel. |
+| `LOG_MAX_FILES` | `14` | Anzahl der aufbewahrten Dateien. |
+| `LOG_STDOUT` | `true` | `false` schaltet die Ausgabe in `docker compose logs` ab. |
+
+Die Anwendung schreibt strukturierte JSON-Logs, eine Zeile je HTTP-Anfrage,
+inklusive aufrufender IP und Antwortzeit.
+
+## Updates einspielen
+
+Neue Update-Dateien in den Ordner `Update/` kopieren. Bei Docker sind sie durch
+das Volume sofort im Container sichtbar. Danach die Daten neu einlesen:
+
+- Knopf **„neu einlesen"** in der Fußzeile der Startseite, oder
+- `curl -X POST http://localhost:5175/api/reload`
+
+Ein Neustart ist nicht nötig.
+
+## Die Seite „Änderungen"
+
+KIAS liefert seine Daten als Basisstand plus eine nummerierte Kette von
+Updates. Beim Zusammenführen entsteht der aktuelle Stand, die Zwischenschritte
+gehen dabei verloren: eine Aktion, die ein Update aufnimmt und ein späteres
+zurückzieht, wäre danach spurlos verschwunden.
+
+Die Seite **Änderungen** (Link in der Fußzeile) hält den Verlauf fest. Je
+Update ist zu sehen, was neu kam, was geändert wurde, was eine neue Nummer
+bekam und was zurückgezogen wurde, jeweils mit dem abgedeckten Zeitraum. Die
+Seite ist durchsuchbar, der Suchbegriff steht in der URL.
+
+Sucht man einen Aktionscode, den es nicht mehr gibt, erklärt die Trefferliste
+den Grund, statt leer zu bleiben:
+
+> **25SC4** gab es, wurde aber mit Update 007 / 2026 (30.04.2026)
+> zurückgezogen und ist deshalb nicht mehr im Bestand.
+
+Der letzte bekannte Stand lässt sich weiterhin vollständig öffnen.
+Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` →
+`WN003/26`).
+
+## API
+
+- `GET /api/status` – Ladezustand, Zähler, `rootOk`
+- `POST /api/reload` – Daten neu einlesen
+- `GET /api/bulletins?q=&fz=&scode=&keyword=&yearFrom=&yearTo=&limit=&offset=`
+- `GET /api/bulletin/:code` – Volltext inklusive verknüpfter Daten
+- `GET /api/vehicles`, `GET /api/scodes`, `GET /api/updates`
+- `GET /api/history` – Änderungen je Update
+- `GET /api/forms/:file` – Formular ausliefern
