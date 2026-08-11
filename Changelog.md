@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.1-alpha] — 2026-08-11
+
 ### Fixed
-- Der Ladebildschirm erscheint jetzt tatsächlich. Das Einlesen der
-  DBF-Dateien blockierte die Event-Loop am Stück, gemessen 6,8 Sekunden
-  lokal und rund eine Minute im Container, in der der Server keine einzige
-  Antwort ausliefern konnte, auch nicht das HTML des Ladebildschirms. Die
-  Leseschleifen geben nun alle 20 ms an die Event-Loop zurück; die längste
-  Blockade liegt bei rund 0,3 Sekunden, die Ladezeit bleibt gleich.
+- The loading screen now actually appears. Reading the DBF files blocked
+  the event loop in one piece (6.8 s locally, about a minute in a
+  container), so the server answered nothing at all during startup, not
+  even the HTML of that screen.
+- The read and merge loops hand control back every 20 ms. Longest block is
+  now 0.3 s, load time is unchanged.
+- Honest wording on the splash: seconds to two minutes depending on the
+  medium, instead of a flat "about 2 minutes".
 
 ## [1.1.0-alpha] — 2026-08-11
 
@@ -66,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.0-alpha...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.1-alpha...HEAD
+[1.1.1-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.1-alpha
 [1.1.0-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.0-alpha
 [1.0.0-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.0.0-alpha
