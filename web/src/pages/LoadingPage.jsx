@@ -66,7 +66,8 @@ export function LoadingPage({ progress, loaded }) {
 
         {phase !== 'complete' && (
           <div className="loading-hint">
-            Beim ersten Start dauert das Einlesen ca. 2 Minuten.
+            Die Datenbank wird eingelesen, das dauert je nach Datenträger
+            einige Sekunden bis zwei Minuten.
             {elapsedSeconds >= 5 && (
               <span className="loading-elapsed"> · {formatElapsed(elapsedSeconds)} verstrichen</span>
             )}

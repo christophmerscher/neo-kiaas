@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Der Ladebildschirm erscheint jetzt tatsächlich. Das Einlesen der
+  DBF-Dateien blockierte die Event-Loop am Stück, gemessen 6,8 Sekunden
+  lokal und rund eine Minute im Container, in der der Server keine einzige
+  Antwort ausliefern konnte, auch nicht das HTML des Ladebildschirms. Die
+  Leseschleifen geben nun alle 20 ms an die Event-Loop zurück; die längste
+  Blockade liegt bei rund 0,3 Sekunden, die Ladezeit bleibt gleich.
+
 ## [1.1.0-alpha] — 2026-08-11
 
 ### Added
