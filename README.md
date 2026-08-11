@@ -19,7 +19,7 @@ curl -O https://raw.githubusercontent.com/christophmerscher/neo-kias/main/.env.e
 cp .env.example .env
 # in .env:
 #   NEO_KIAS_IMAGE=ghcr.io/christophmerscher/neo-kias
-#   IMAGE_TAG=latest         # oder z. B. 1.0.0-alpha für Pinning
+#   IMAGE_TAG=latest         # oder z. B. 1.1.0-alpha für Pinning
 #   KIAS_DATA_DIR=/pfad/zum/Kias
 
 # 3) Image holen und starten
