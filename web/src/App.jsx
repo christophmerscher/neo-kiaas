@@ -427,6 +427,13 @@ function LandingPage({
               <button className="linklike" onClick={() => onOpenHistory()}>Änderungen</button>
             </>
           )}
+          {status?.features?.apiDocs && (
+            <>
+              {' · '}
+              {/* Leaves the SPA, hence a real link rather than a button. */}
+              <a className="linklike" href="/api/docs" target="_blank" rel="noopener noreferrer">API</a>
+            </>
+          )}
           {' · '}
           <button className="linklike" onClick={onOpenInfo}>Über neo-KIAS</button>
         </div>

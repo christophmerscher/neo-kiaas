@@ -349,6 +349,8 @@ button { font-family: inherit; }
   font-family: inherit;
 }
 .linklike:hover { text-decoration: underline; }
+/* Same look for the one linklike that is a real anchor (API docs). */
+a.linklike { text-decoration: none; }
 
 /* === View toggle (pill) === */
 .view-toggle {

@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   access; the bare spec is at `/api/docs/openapi.json`.
 - `KIAS_API_DOCS` (default `true`) switches it off; the path then
   answers 404.
+- Footer link **API** on the landing page, shown only when the docs are
+  enabled.
 
 ## [1.1.1-alpha] — 2026-08-11
 
