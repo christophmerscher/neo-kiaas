@@ -56,6 +56,20 @@ npm start
 Die Anwendung lädt beim Start alle Dateien aus `../Daten` und wendet danach alle
 Update-Dateien aus `../Update` der Reihe nach an (Insert/Update/Delete nach `UPAKTION`).
 
+Ohne weitere Angabe sucht die Anwendung die Daten also **eine Ebene über dem
+Anwendungsverzeichnis**. Liegt das Repository woanders als die KIAS-Installation
+(typisch bei Entwicklung), gibt es zwei Wege:
+
+```bash
+# einmalig für diese Shell
+$env:KIAS_ROOT = "C:\Users\me\Kias"; npm start
+```
+
+oder dauerhaft über die `.env` im Anwendungsverzeichnis, die auch ohne Docker
+gelesen wird (`KIAS_ROOT`, ersatzweise `KIAS_DATA_DIR`). Zeigt die Datenwurzel
+ins Leere, meldet der Start eine Fehlerzeile im Log und `/api/status` liefert
+`rootOk: false`, statt eine leere Datenbank vorzutäuschen.
+
 ## Updates einspielen
 
 Wenn neue Updatedaateien im `Update/`-Ordner landen:

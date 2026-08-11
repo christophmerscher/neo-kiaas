@@ -19,6 +19,26 @@ const { SearchEngine } = require('./lib/search/SearchEngine');
 const { ReferenceResolver } = require('./lib/search/ReferenceResolver');
 const { buildApp } = require('./lib/api/routes');
 
+/**
+ * Complain loudly when the configured data root doesn't look like a KIAS
+ * installation. Missing DBF files are skipped silently by the loader, so
+ * without this check a wrong KIAS_ROOT looks exactly like a successful
+ * load of an empty database: "0 Aktionen" and no error anywhere.
+ *
+ * @returns {boolean} Whether Daten/ exists under the configured root.
+ */
+function checkDataRoot() {
+  const datenDir = require('path').join(config.dataRoot, 'Daten');
+  if (fs.existsSync(datenDir)) return true;
+  logger.error(
+    { root: config.dataRoot, expected: datenDir },
+    'data root has no Daten/ subdirectory — the app will start up empty. '
+    + 'Set KIAS_ROOT (or KIAS_DATA_DIR) to the folder that contains '
+    + 'Daten/, Update/ and Formulare/.',
+  );
+  return false;
+}
+
 function main() {
   logger.info({
     root: config.dataRoot,
@@ -30,6 +50,8 @@ function main() {
     logging: logger.kiasConfig,
     search: { blobs: config.searchBlobs, cacheSize: config.searchCacheSize },
   }, 'neo-KIAS starting');
+
+  checkDataRoot();
 
   const store = new Store(config.dataRoot, { logger, searchBlobs: config.searchBlobs });
   const search = new SearchEngine(store, { cacheSize: config.searchCacheSize });
@@ -50,7 +72,18 @@ function main() {
   // Kick off the load. We log success/failure but don't tie it to listen()
   // — the server keeps serving the loading screen + /api/status either way.
   store.load()
-    .then(() => logger.info('initial data load complete; serving live requests'))
+    .then(() => {
+      const { aktion } = store.counts();
+      if (!aktion) {
+        logger.error(
+          { root: config.dataRoot },
+          'data load finished with 0 bulletins — check that KIAS_ROOT points '
+          + 'at the folder containing Daten/, Update/ and Formulare/.',
+        );
+        return;
+      }
+      logger.info('initial data load complete; serving live requests');
+    })
     .catch(err => {
       logger.fatal({ err: err.message, stack: err.stack }, 'initial data load failed');
       process.exit(1);

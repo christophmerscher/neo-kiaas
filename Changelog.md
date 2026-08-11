@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- The app now reads its own `.env` when started outside Docker, and
+  accepts `KIAS_DATA_DIR` as a fallback for `KIAS_ROOT`. Previously
+  `npm start` ignored the file entirely and fell back to the directory
+  above the app, which loads zero rows whenever the repo and the KIAS
+  installation live in different places.
+- A data root without a `Daten/` subdirectory, and a load that ends with
+  zero bulletins, are now logged as errors instead of passing for a
+  successful load. `/api/status` reports `rootOk`.
+
 ### Changed
 - Search is substantially faster. Rows now carry a precomputed lowercased
   blob of their text fields, so a query does one `includes` per row instead
