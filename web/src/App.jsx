@@ -31,6 +31,7 @@ import { VersionBadge } from './components/VersionBadge';
 import { Highlight } from './components/Highlight';
 import { InfoModal } from './components/InfoModal';
 import { Detail } from './components/Detail';
+import { Toast } from './components/Toast';
 
 import { ScodesPage } from './pages/ScodesPage';
 import { VehiclesPage } from './pages/VehiclesPage';
@@ -52,6 +53,9 @@ export default function App() {
   /** Update changelog, fetched lazily the first time the page is opened. */
   const [history, setHistory] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  /** Rueckmeldung des letzten "neu einlesen", blendet sich selbst aus. */
+  const [reloadHint, setReloadHint] = useState(null);
+  const [reloading, setReloading] = useState(false);
   /** True once the post-load success animation has finished — gates the
    *  switch from LoadingPage to the main UI. */
   const [bootAnimationDone, setBootAnimationDone] = useState(false);
@@ -175,7 +179,43 @@ export default function App() {
   }, [page, history, historyLoading]);
 
   // ── Action handlers ─────────────────────────────────────────────────
-  const reload = async () => setStatus(await postJson('/api/reload'));
+  /**
+   * "neu einlesen" fragt den Server, ob sich die Dateien geändert haben.
+   * Meist lautet die Antwort nein, deshalb braucht der Klick eine
+   * sichtbare Rückmeldung, sonst wirkt er wirkungslos.
+   */
+  const reload = async () => {
+    if (reloading) return;
+    setReloading(true);
+    try {
+      const res = await postJson('/api/reload');
+      setStatus(res);
+      const r = res.reload || {};
+      if (r.reloaded) {
+        setReloadHint({
+          tone: 'success',
+          text: `Neu eingelesen: ${(res.counts?.aktion ?? 0).toLocaleString()} Aktionen.`,
+        });
+      } else if (r.reason === 'in-progress') {
+        setReloadHint({ tone: 'info', text: 'Es lief bereits ein Einlesen, der Stand ist aktuell.' });
+      } else {
+        setReloadHint({
+          tone: 'info',
+          text: `Keine Änderungen an den Daten (${(r.files ?? 0).toLocaleString()} Dateien geprüft).`,
+        });
+      }
+    } catch {
+      setReloadHint({ tone: 'error', text: 'Neu einlesen fehlgeschlagen.' });
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!reloadHint) return;
+    const t = setTimeout(() => setReloadHint(null), 6000);
+    return () => clearTimeout(t);
+  }, [reloadHint]);
 
   const vehicleLabel = useMemo(() => {
     const map = new Map(vehicles.map(v => [v.FZ, v.INTBEZEICH || v.BEZEICH || v.FZ]));
@@ -311,6 +351,8 @@ export default function App() {
         view={view} setView={setView}
         theme={theme} toggleTheme={toggleTheme}
         reload={reload}
+        reloading={reloading}
+        reloadHint={reloadHint}
         onOpenScodes={openScodes}
         onOpenVehicles={openVehicles}
         onOpenHistory={openHistory}
@@ -333,6 +375,8 @@ export default function App() {
         view={view} setView={setView}
         theme={theme} toggleTheme={toggleTheme}
         reload={reload}
+        reloading={reloading}
+        reloadHint={reloadHint}
         onOpenScodes={openScodes}
         onOpenVehicles={openVehicles}
         onOpenInfo={openInfo}
@@ -353,6 +397,8 @@ export default function App() {
       view={view} setView={setView}
       theme={theme} toggleTheme={toggleTheme}
       reload={reload}
+      reloading={reloading}
+      reloadHint={reloadHint}
       onOpenScodes={openScodes}
       onOpenVehicles={openVehicles}
       onOpenHistory={openHistory}
@@ -369,7 +415,8 @@ export default function App() {
 function LandingPage({
   status, q, setQ, view, setView,
   theme, toggleTheme,
-  reload, onOpenScodes, onOpenVehicles, onOpenHistory, onOpenInfo,
+  reload, reloading, reloadHint,
+  onOpenScodes, onOpenVehicles, onOpenHistory, onOpenInfo,
   onYearFromShortcut,
   infoOpen, onCloseInfo,
 }) {
@@ -415,7 +462,9 @@ function LandingPage({
           {status?.loaded && (
             <>
               Stand {fmtDateTime(status.loadedAt)} ·{' '}
-              <button className="linklike" onClick={reload}>neu einlesen</button>{' · '}
+              <button className="linklike" onClick={reload} disabled={reloading}>
+                {reloading ? 'liest ein…' : 'neu einlesen'}
+              </button>{' · '}
             </>
           )}
           <button className="linklike" onClick={onOpenScodes}>Symptomcodes</button>
@@ -445,6 +494,7 @@ function LandingPage({
         </div>
       </div>
       {infoOpen && <InfoModal onClose={onCloseInfo} />}
+      <Toast hint={reloadHint} />
     </div>
   );
 }
@@ -459,7 +509,7 @@ function ClassicView({
   detail,
   view, setView,
   theme, toggleTheme,
-  reload, onOpenScodes, onOpenVehicles, onOpenInfo,
+  reload, reloading, reloadHint, onOpenScodes, onOpenVehicles, onOpenInfo,
   followReference, vehicleLabel,
   infoOpen, closeInfo,
 }) {
@@ -493,9 +543,16 @@ function ClassicView({
             </>
           ) : 'Lade Daten…'}
         </span>
-        <button onClick={reload} title="Daten neu aus DBF-Dateien einlesen">Neu laden</button>
+        <button
+          onClick={reload}
+          disabled={reloading}
+          title="Prüfen, ob sich die DBF-Dateien geändert haben, und nur dann neu einlesen"
+        >
+          {reloading ? 'liest ein…' : 'Neu laden'}
+        </button>
       </header>
       {infoOpen && <InfoModal onClose={closeInfo} />}
+      <Toast hint={reloadHint} />
 
       <div className="layout">
         <aside className="sidebar">
@@ -598,13 +655,12 @@ function ClassicView({
 }
 
 // ── Google-style view (results list + detail page) ─────────────────────────
-
 function GoogleView({
   url, exitDetail,
   vehicles, scodes,
   results, loading, detail, qDeb,
   view, setView, theme, toggleTheme,
-  reload, onOpenScodes, onOpenVehicles, onOpenHistory, onOpenInfo,
+  reload, reloading, reloadHint, onOpenScodes, onOpenVehicles, onOpenHistory, onOpenInfo,
   followReference, vehicleLabel,
   infoOpen, closeInfo,
 }) {
@@ -650,7 +706,14 @@ function GoogleView({
           <button className="header-link" onClick={onOpenScodes} title="Alle Symptomcodes ansehen">Symptomcodes</button>
           <button className="header-link" onClick={onOpenVehicles} title="Alle Fahrzeuge ansehen">Fahrzeuge</button>
           <button className="info-btn" onClick={onOpenInfo} title="Über neo-KIAS" aria-label="Info">i</button>
-          <button className="reload-btn" onClick={reload} title="Daten neu aus DBF-Dateien einlesen">↻</button>
+          <button
+            className="reload-btn"
+            onClick={reload}
+            disabled={reloading}
+            title="Prüfen, ob sich die DBF-Dateien geändert haben, und nur dann neu einlesen"
+          >
+            ↻
+          </button>
         </div>
         <div className="filter-bar">
           <select value={fz} onChange={sx(setFz)}>
@@ -710,6 +773,7 @@ function GoogleView({
         />
       )}
       {infoOpen && <InfoModal onClose={closeInfo} />}
+      <Toast hint={reloadHint} />
     </div>
   );
 }

@@ -249,6 +249,26 @@ das Volume sofort im Container sichtbar. Danach die Daten neu einlesen:
 
 Ein Neustart ist nicht nötig.
 
+### Wann wirklich gelesen wird
+
+Die Anwendung läuft ohne Anmeldung, jeder Benutzer sieht den Knopf. Damit er
+nicht bei jedem Klick minutenlange Leseläufe auslöst, prüft der Server zuerst
+Größe und Änderungsdatum aller Dateien, die er liest, rund tausend Stück in
+etwa 50 Millisekunden. Stimmen sie mit dem Stand des letzten Einlesens
+überein, passiert nichts und die Oberfläche meldet „Keine Änderungen an den
+Daten".
+
+Klicken mehrere Personen gleichzeitig, entsteht trotzdem nur ein Ladevorgang:
+wer währenddessen klickt, wartet auf den laufenden mit, statt einen zweiten
+anzustoßen.
+
+Hat eine Kopie Größe und Zeitstempel erhalten, sodass die Prüfung die Änderung
+nicht sieht, hilft:
+
+```bash
+curl -X POST "http://localhost:5175/api/reload?force=true"
+```
+
 ## Die Seite „Änderungen"
 
 KIAS liefert seine Daten als Basisstand plus eine nummerierte Kette von

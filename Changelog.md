@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- „neu einlesen" liest nur noch, wenn sich die Daten geändert haben. Der
+  Server vergleicht Größe und Änderungsdatum aller gelesenen Dateien mit
+  dem Stand des letzten Einlesens; bei Gleichstand antwortet er sofort.
+  Auf einem Server ohne Anmeldung, wo jeder den Knopf sieht, spart das die
+  wiederholten Leseläufe.
+- Gleichzeitige Klicks lösen keinen zweiten Ladevorgang mehr aus, sie
+  warten auf den laufenden. Sechs gleichzeitige Anfragen ergeben ein
+  Einlesen.
+- Die Oberfläche meldet das Ergebnis („Keine Änderungen an den Daten",
+  „Neu eingelesen: X Aktionen") und sperrt den Knopf währenddessen.
+- `/api/reload?force=true` erzwingt das Einlesen, falls eine Kopie Größe
+  und Zeitstempel erhalten hat.
+- `/api/status` enthält `dataCheck` mit dem Fingerabdruck der Dateien.
+
 ## [1.1.3-alpha] — 2026-08-14
 
 ### Added
