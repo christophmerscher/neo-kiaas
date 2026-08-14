@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.4-alpha] — 2026-08-14
+
 ### Changed
 - „neu einlesen" liest nur noch, wenn sich die Daten geändert haben. Der
   Server vergleicht Größe und Änderungsdatum aller gelesenen Dateien mit
@@ -115,7 +117,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.3-alpha...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.4-alpha...HEAD
+[1.1.4-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.4-alpha
 [1.1.3-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.3-alpha
 [1.1.2-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.2-alpha
 [1.1.1-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.1-alpha
