@@ -7,16 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.3-alpha] — 2026-08-14
+
 ### Added
-- `scripts/install-debian.sh`: installiert Docker samt Compose-Plugin,
+- `scripts/install-debian.sh`: bringt eine Debian-Maschine von null auf
+  einen laufenden neo-KIAS. Installiert Docker samt Compose-Plugin,
   kopiert das Repository nach `/opt/neo-kias`, legt die `.env` aus
   `.env.example` an, baut das Image und richtet einen systemd-Dienst ein,
-  der beim Booten startet. Wiederholbar, ohne vorhandene `.env` und Logs
-  anzufassen.
+  der beim Booten startet.
+- Das Skript ist wiederholbar: ein zweiter Lauf aktualisiert Code und
+  Image, lässt `.env` und Logs aber unberührt.
+- README: Abschnitt zur Installation samt Optionen.
 
 ### Fixed
-- Tabelle „Bilder" in der README war zerschossen, die Zeile zu
+- Zerschossene Tabelle „Bilder" in der README, die Zeile zu
   `KIAS_API_DOCS` stand zwischen Kopf und Trennzeile.
+- `.gitattributes` erzwingt LF für Shell-Skripte, sonst scheitert ein auf
+  Windows ausgecheckter Installer unter Linux am Zeilenende.
 
 ## [1.1.2-alpha] — 2026-08-11
 
@@ -93,7 +100,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.2-alpha...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.3-alpha...HEAD
+[1.1.3-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.3-alpha
 [1.1.2-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.2-alpha
 [1.1.1-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.1-alpha
 [1.1.0-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.0-alpha

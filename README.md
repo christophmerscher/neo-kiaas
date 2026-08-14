@@ -51,17 +51,48 @@ vorhanden, kopiert das Repository nach `/opt/neo-kias`, legt die `.env` aus
 `.env.example` an, baut das Image und richtet einen systemd-Dienst ein, der
 beim Booten startet.
 
+Repository holen und in das Verzeichnis wechseln:
+
+```bash
+git clone https://github.com/christophmerscher/neo-kiaas.git
+```
+
+```bash
+cd neo-kiaas
+```
+
+Skript ausführen, mit dem Pfad zum Datenverzeichnis:
+
 ```bash
 sudo ./scripts/install-debian.sh --data-dir /srv/kias
 ```
 
-Ohne `--data-dir` fragt das Skript danach. Weitere Optionen: `--port` für den
-Host-Port, `--skip-docker`, wenn Docker schon verwaltet wird, `--no-start`,
-um den Dienst nur einzurichten.
+Sollte das Skript nicht ausführbar sein, etwa weil das Repository als ZIP
+heruntergeladen wurde, hilft eines von beiden:
 
-Das Skript ist wiederholbar. Beim zweiten Lauf wird der Code aktualisiert und
-das Image neu gebaut, eine vorhandene `.env` und die Logs bleiben unangetastet.
-Danach:
+```bash
+sudo bash scripts/install-debian.sh --data-dir /srv/kias
+```
+
+```bash
+chmod +x scripts/install-debian.sh
+```
+
+Danach läuft die Oberfläche auf **http://SERVER:5175**. Das erste Einlesen
+dauert je nach Datenträger bis zu zwei Minuten, solange zeigt die Seite einen
+Ladebildschirm mit Fortschritt.
+
+### Optionen
+
+| Option | Bedeutung |
+|---|---|
+| `--data-dir PFAD` | Verzeichnis mit `Daten/`, `Update/` und `Formulare/`. Ohne Angabe fragt das Skript danach. |
+| `--port PORT` | Port auf dem Host, Standard `5175`. |
+| `--skip-docker` | Docker nicht anfassen, es ist bereits vorhanden. |
+| `--no-start` | Dienst einrichten und aktivieren, aber nicht starten. |
+| `-h`, `--help` | Hilfe anzeigen. |
+
+### Danach
 
 ```bash
 systemctl status neo-kias
@@ -71,7 +102,13 @@ systemctl status neo-kias
 journalctl -u neo-kias -f
 ```
 
-Nach einer Aktualisierung des Codes das Image neu bauen lassen:
+Das Skript ist wiederholbar: ein zweiter Lauf aktualisiert den Code und baut
+das Image neu, eine vorhandene `.env` und die Logs bleiben unangetastet. Das
+Datenverzeichnis wird dabei aus der bestehenden `.env` übernommen, `--data-dir`
+ist also nur beim ersten Mal nötig.
+
+Wurde nur die Konfiguration geändert, genügt ein Neustart des Dienstes. Nach
+einer Änderung am Code baut `reload` das Image neu:
 
 ```bash
 systemctl reload neo-kias
