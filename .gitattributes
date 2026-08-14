@@ -1,0 +1,9 @@
+# Shell-Skripte müssen unter Linux mit LF ankommen. Ohne diese Regel
+# checkt Git sie auf Windows mit CRLF aus, und ein nach Linux kopiertes
+# Skript scheitert mit "bad interpreter: No such file or directory".
+*.sh text eol=lf
+
+# Dockerfile und Compose werden ebenfalls von Linux-Werkzeugen gelesen.
+Dockerfile text eol=lf
+*.yml text eol=lf
+.env.example text eol=lf
