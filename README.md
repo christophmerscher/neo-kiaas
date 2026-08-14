@@ -43,6 +43,40 @@ Beim Start werden die Basisdateien gelesen und anschließend alle update Dateien
 der Reihe nach angewendet. Das dauert je nach Datenträger einige Sekunden bis
 gut eine Minute; solange zeigt die Oberfläche einen Ladebildschirm.
 
+## Installation auf Debian
+
+Für einen Server, auf dem neo-KIAS dauerhaft laufen soll, gibt es ein
+Installationsskript. Es installiert Docker samt Compose-Plugin, falls nicht
+vorhanden, kopiert das Repository nach `/opt/neo-kias`, legt die `.env` aus
+`.env.example` an, baut das Image und richtet einen systemd-Dienst ein, der
+beim Booten startet.
+
+```bash
+sudo ./scripts/install-debian.sh --data-dir /srv/kias
+```
+
+Ohne `--data-dir` fragt das Skript danach. Weitere Optionen: `--port` für den
+Host-Port, `--skip-docker`, wenn Docker schon verwaltet wird, `--no-start`,
+um den Dienst nur einzurichten.
+
+Das Skript ist wiederholbar. Beim zweiten Lauf wird der Code aktualisiert und
+das Image neu gebaut, eine vorhandene `.env` und die Logs bleiben unangetastet.
+Danach:
+
+```bash
+systemctl status neo-kias
+```
+
+```bash
+journalctl -u neo-kias -f
+```
+
+Nach einer Aktualisierung des Codes das Image neu bauen lassen:
+
+```bash
+systemctl reload neo-kias
+```
+
 ## Starten mit Docker
 
 Es gibt kein vorgefertigtes Image, gebaut wird immer aus diesem Repository.
@@ -144,12 +178,12 @@ und `KIAS_DATA_DIR` auf den Mountpoint gesetzt.
 | `KIAS_SEARCH_BLOBS` | `true` | Beim Laden je Datensatz eine kleingeschriebene Kopie aller Textfelder vorberechnen. Die erste Suche je Filterkombination wird schneller. |
 | `KIAS_SEARCH_CACHE` | `50` | Anzahl der Filterkombinationen, deren Trefferliste im Speicher bleibt. Wiederholte Suchen und das Blättern werden daraus bedient. Wird bei jedem Reload verworfen. |
 | `KIAS_HISTORY` | `true` | Änderungshistorie der Updates mitschreiben. Schaltet die Seite **Änderungen** frei und erklärt bei der Suche nach einem nicht mehr vorhandenen Aktionscode, was mit ihm passiert ist. |
+| `KIAS_API_DOCS` | `true` | Swagger UI der JSON Schnittstelle unter `/api/docs`, lokal ausgeliefert und damit auch ohne Internet nutzbar. Auf `false` antwortet der Pfad mit 404. |
 
 
 ### Bilder
 
 | Variable | Default | Beschreibung |
-| `KIAS_API_DOCS` | `true` | Swagger UI der JSON Schnittstelle unter `/api/docs`. Wird lokal aus dem Paket `swagger-ui-dist` ausgeliefert, funktioniert also ohne Internet. Auf `false` antwortet der Pfad mit 404. |
 |---|---|---|
 | `KIAS_SHOW_CAR_IMAGES` | `false` | Fotobereich auf den Fahrzeugkarten einschalten. Ohne passendes Bild erscheint eine generische Silhouette. |
 | `KIAS_CAR_IMAGES_DIR` | `./car-images` | Verzeichnis mit den Fahrzeugfotos. Dateiname ist der kleingeschriebene Modellname, etwa `mondeo.png`. |

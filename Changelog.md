@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `scripts/install-debian.sh`: installiert Docker samt Compose-Plugin,
+  kopiert das Repository nach `/opt/neo-kias`, legt die `.env` aus
+  `.env.example` an, baut das Image und richtet einen systemd-Dienst ein,
+  der beim Booten startet. Wiederholbar, ohne vorhandene `.env` und Logs
+  anzufassen.
+
+### Fixed
+- Tabelle „Bilder" in der README war zerschossen, die Zeile zu
+  `KIAS_API_DOCS` stand zwischen Kopf und Trennzeile.
+
 ## [1.1.2-alpha] — 2026-08-11
 
 ### Added
