@@ -43,13 +43,43 @@ Beim Start werden die Basisdateien gelesen und anschließend alle update Dateien
 der Reihe nach angewendet. Das dauert je nach Datenträger einige Sekunden bis
 gut eine Minute; solange zeigt die Oberfläche einen Ladebildschirm.
 
+## Aufbau: vier Dienste
+
+Compose startet vier Container, drei davon aus einem Image:
+
+| Dienst | Aufgabe | Port auf dem Host |
+|---|---|---|
+| `neo-kias` | React-Suchoberfläche für Menschen. Liefert das gebaute Bündel aus und reicht `/api/*` an `rest-kias` weiter. | `5175` (`HOST_PORT`) |
+| `rest-kias` | REST-Schnittstelle. Liest die DBF-Daten, beantwortet `/api/*`. Einstieg für die App athena-KIAS. | `5176` (`API_PORT`) |
+| `admin-kias` | Vue-Verwaltung: Datenpfad und Neu-Einlesen, hinter einem Passwort. Nur im Profil `admin`. | `5177` (`ADMIN_PORT`) |
+| `kias-db` | Postgres für die Einstellungen, die die Verwaltung ändern darf. Nur im Profil `admin`. | keiner |
+
+Die Daten hängen nur am Dienst `rest-kias`; er allein braucht das Volume und
+die ein bis zwei Minuten zum Einlesen. Die Oberflächen starten in Sekunden und
+zeigen so lange ihren Ladebildschirm.
+
+In `kias-db` liegen **nicht** die KIAS-Daten. Die bleiben in den DBF-Dateien
+und im Speicher von `rest-kias`. Die Datenbank hält nur, was die Verwaltung
+verstellen darf, und das ist bisher der Datenpfad.
+
+Dass die Oberfläche die Aufrufe weiterreicht, statt den Browser direkt zur
+Schnittstelle zu schicken, hat einen Grund: das React-Bündel spricht seine
+Endpunkte relativ an (`/api/bulletins`). Eine absolute Adresse müsste beim
+Bauen feststehen, bräuchte CORS und einen zweiten offenen Port für jeden
+Browser. So bleibt für die Seite alles eine Herkunft.
+
+Wer beides in einem Prozess will, wie bisher, setzt `KIAS_ROLE=all`; das ist
+die Voreinstellung außerhalb von Compose und damit das, was `npm start` tut.
+
 ## Installation auf Debian
 
 Für einen Server, auf dem neo-KIAS dauerhaft laufen soll, gibt es ein
 Installationsskript. Es installiert Docker samt Compose-Plugin, falls nicht
 vorhanden, kopiert das Repository nach `/opt/neo-kias`, legt die `.env` aus
-`.env.example` an, baut das Image und richtet einen systemd-Dienst ein, der
-beim Booten startet.
+`.env.example` an, würfelt die Passwörter für Verwaltung und Datenbank aus,
+baut das Image und richtet einen systemd-Dienst ein, der beim Booten startet.
+Zum Schluss wartet es, bis die Dienste antworten, und zeigt das erzeugte
+Passwort genau einmal an.
 
 Repository holen und in das Verzeichnis wechseln:
 
@@ -78,16 +108,26 @@ sudo bash scripts/install-debian.sh --data-dir /srv/kias
 chmod +x scripts/install-debian.sh
 ```
 
-Danach läuft die Oberfläche auf **http://SERVER:5175**. Das erste Einlesen
-dauert je nach Datenträger bis zu zwei Minuten, solange zeigt die Seite einen
-Ladebildschirm mit Fortschritt.
+Danach läuft die Suche auf **http://SERVER:5175**, die Verwaltung auf
+**http://SERVER:5177** und die Schnittstelle auf **http://SERVER:5176**. Das
+erste Einlesen dauert je nach Datenträger bis zu zwei Minuten, solange zeigt
+die Seite einen Ladebildschirm mit Fortschritt.
+
+Das Passwort der Verwaltung steht am Ende des Laufs auf dem Bildschirm.
+Es wird zufällig erzeugt, damit auf einem erreichbaren Server nicht die
+Voreinstellung „admin" gilt, und liegt danach nur noch in der `.env`. Wer
+lieber ein eigenes vergibt, nimmt `--admin-password`.
 
 ### Optionen
 
 | Option | Bedeutung |
 |---|---|
 | `--data-dir PFAD` | Verzeichnis mit `Daten/`, `Update/` und `Formulare/`. Ohne Angabe fragt das Skript danach. |
-| `--port PORT` | Port auf dem Host, Standard `5175`. |
+| `--port PORT` | Port der Suche, Standard `5175`. |
+| `--api-port PORT` | Port der Schnittstelle, Standard `5176`. |
+| `--admin-port PORT` | Port der Verwaltung, Standard `5177`. |
+| `--admin-password PASS` | Passwort der Verwaltung. Ohne Angabe wird beim ersten Lauf eines erzeugt. |
+| `--no-admin` | Ohne Verwaltung und ohne Datenbank installieren. Dann gibt es keinen Weg, die Daten neu einzulesen. |
 | `--skip-docker` | Docker nicht anfassen, es ist bereits vorhanden. |
 | `--no-start` | Dienst einrichten und aktivieren, aber nicht starten. |
 | `-h`, `--help` | Hilfe anzeigen. |
@@ -103,9 +143,15 @@ journalctl -u neo-kias -f
 ```
 
 Das Skript ist wiederholbar: ein zweiter Lauf aktualisiert den Code und baut
-das Image neu, eine vorhandene `.env` und die Logs bleiben unangetastet. Das
-Datenverzeichnis wird dabei aus der bestehenden `.env` übernommen, `--data-dir`
-ist also nur beim ersten Mal nötig.
+das Image neu, eingestellte Werte in der `.env` und die Logs bleiben
+unangetastet, Passwörter werden nicht neu gewürfelt. Das Datenverzeichnis wird
+aus der bestehenden `.env` übernommen, `--data-dir` ist also nur beim ersten
+Mal nötig.
+
+Kommt in einer neuen Fassung ein Schlüssel dazu, ergänzt ihn der nächste Lauf
+in der vorhandenen `.env` und sagt, welche es waren. Eine Installation aus der
+Zeit vor der Verwaltung bekommt so `COMPOSE_PROFILES`, `KIAS_ADMIN` und ein
+frisch erzeugtes Passwort, ohne dass jemand die Datei von Hand nachzieht.
 
 Wurde nur die Konfiguration geändert, genügt ein Neustart des Dienstes. Nach
 einer Änderung am Code baut `reload` das Image neu:
@@ -136,7 +182,13 @@ Bauen und starten:
 docker compose up -d --build
 ```
 
-Die Oberfläche läuft dann auf **http://localhost:5175**.
+Die Suche läuft dann auf **http://localhost:5175**, die Schnittstelle auf
+**http://localhost:5176**, die Verwaltung auf **http://localhost:5177**. Die
+drei Container werden aus demselben Image gebaut, der zweite und dritte Bau
+sind Treffer im Cache.
+
+Beim ersten Aufruf der Verwaltung meldet man sich mit `admin` an; das Passwort
+steht in `KIAS_ADMIN_PASSWORD`, ohne Angabe ist es ebenfalls `admin`.
 
 Weitere Befehle:
 
@@ -145,7 +197,11 @@ docker compose ps
 ```
 
 ```bash
-docker compose logs -f
+docker compose logs -f rest-kias
+```
+
+```bash
+docker compose restart neo-kias
 ```
 
 ```bash
@@ -168,6 +224,16 @@ npm run install:web
 npm run build:web
 ```
 
+Wer die Verwaltung braucht, baut ihr Bündel dazu:
+
+```bash
+npm run install:admin
+```
+
+```bash
+npm run build:admin
+```
+
 ```bash
 npm start
 ```
@@ -186,8 +252,44 @@ $env:KIAS_ROOT = "C:\Users\me\Kias"; npm start
 Zeigt die Datenwurzel ins Leere, meldet der Start eine Fehlerzeile im Log und
 `/api/status` liefert `rootOk: false`, statt eine leere Datenbank vorzutäuschen.
 
+Für die Entwicklung an der Oberfläche:
 
-Vite läuft dann auf http://localhost:5173 und leitet `/api` an Port 5175 weiter.
+```bash
+npm run dev:web
+```
+
+Vite läuft dann auf http://localhost:5173 und leitet `/api` an Port 5175
+weiter, oder an `KIAS_API_URL`, falls gesetzt.
+
+### Getrennt starten
+
+Dieselben Hälften wie in Compose, nur ohne Container. Je ein Terminal:
+
+```bash
+npm run start:api
+```
+
+```bash
+npm run start:web
+```
+
+```bash
+npm run start:admin
+```
+
+Der erste Prozess liest die Daten und bedient `/api`, der zweite liefert die
+Oberfläche aus. Beide wollen den Port aus der `.env`, einer braucht deshalb
+einen eigenen. Unter Windows:
+
+```bash
+$env:PORT = "5176"; npm run start:api
+```
+
+```bash
+$env:KIAS_API_URL = "http://localhost:5176"; npm run start:web
+```
+
+Unter Linux und macOS entsprechend `PORT=5176 npm run start:api`.
 
 ## Konfiguration
 
@@ -202,12 +304,27 @@ Vorrang vor der Datei.
 |---|---|---|
 | `KIAS_DATA_DIR` | – | **Pflicht.** Absoluter Pfad zum Verzeichnis mit `Daten/`, `Update/` und `Formulare/`. Bei Docker der Host Pfad für den Mount, bei npm die Datenwurzel. |
 | `KIAS_ROOT` | eine Ebene über der App | Datenwurzel der Anwendung. Im Container setzt compose sie auf `/data`. Nur nötig, wenn sie von `KIAS_DATA_DIR` abweichen soll. |
-| `HOST_PORT` | `5175` | Port auf dem Host (nur Docker). |
+| `HOST_PORT` | `5175` | Port der Suchoberfläche auf dem Host (nur Docker). |
+| `API_PORT` | `5176` | Port der Schnittstelle auf dem Host (nur Docker). Diese Adresse trägt man in athena-KIAS ein. |
+| `ADMIN_PORT` | `5177` | Port der Verwaltung auf dem Host (nur Docker). |
+| `KIAS_ROLE` | `all` | Was der Prozess bedient: `api`, `web`, `admin` oder alles zusammen. Compose setzt es je Container selbst. |
+| `KIAS_API_URL` | `http://rest-kias:5175` | Ziel, an das die Oberfläche `/api` weiterreicht. Nur in der Rolle `web` benutzt. |
 | `TZ` | `Europe/Berlin` | Zeitzone im Container. |
 | `KIAS_SERVER_NAME` | Rechnername | Name, unter dem sich der Server bei `/api/ping` meldet. Nützlich, wenn mehrere Server im Betrieb laufen. |
 
 Liegen die Daten auf einer Netzwerkfreigabe, wird diese auf dem Host gemountet
 und `KIAS_DATA_DIR` auf den Mountpoint gesetzt.
+
+### Verwaltung
+
+| Variable | Default | Beschreibung |
+|---|---|---|
+| `COMPOSE_PROFILES` | `admin` | Mit `admin` starten die Container `admin-kias` und `kias-db`. Leer lassen heißt: keine Verwaltung. |
+| `KIAS_ADMIN` | `true` | Schaltet `/api/admin/*` und `POST /api/reload` in `rest-kias` frei. Gehört zu `COMPOSE_PROFILES`, beide zusammen umstellen. |
+| `KIAS_ADMIN_PASSWORD` | `admin` | Passwort der Verwaltung. Der Benutzername ist immer `admin`. Ohne Angabe warnt der Start und die Oberfläche zeigt einen Hinweis. |
+| `KIAS_ADMIN_SESSION_HOURS` | `8` | Wie lange eine Anmeldung gilt. |
+| `POSTGRES_PASSWORD` | `kias` | Passwort der Einstellungsdatenbank. Sie ist nach außen nicht geöffnet. |
+| `DATABASE_URL` | aus `POSTGRES_PASSWORD` | Vollständige Adresse der Einstellungsdatenbank. Eigene Angabe nur für einen bereits vorhandenen Postgres. Leer heißt: keine Datenbank. |
 
 ### Suche und Speicherbedarf
 
@@ -243,32 +360,64 @@ inklusive aufrufender IP und Antwortzeit.
 ## Updates einspielen
 
 Neue Update Dateien in den Ordner `Update/` kopieren. Bei Docker sind sie durch
-das Volume sofort im Container sichtbar. Danach die Daten neu einlesen:
-
-- Knopf **„neu einlesen"** in der Fußzeile der Startseite, oder
-- `curl -X POST http://localhost:5175/api/reload`
+das Volume sofort im Container sichtbar. Danach die Daten neu einlesen, in der
+**Verwaltung** unter http://localhost:5177, Karte „Neu einlesen".
 
 Ein Neustart ist nicht nötig.
 
+Aus der Suchoberfläche ist der Knopf verschwunden. Sie läuft ohne Anmeldung,
+also sah ihn jeder, der die Seite offen hatte; ein Leselauf betrifft aber alle
+Benutzer gleichzeitig. Für Skripte geht es weiter über die Schnittstelle,
+jetzt mit Zugangsdaten:
+
+```bash
+curl -u admin:PASSWORT -X POST http://localhost:5176/api/reload
+```
+
 ### Wann wirklich gelesen wird
 
-Die Anwendung läuft ohne Anmeldung, jeder Benutzer sieht den Knopf. Damit er
-nicht bei jedem Klick minutenlange Leseläufe auslöst, prüft der Server zuerst
-Größe und Änderungsdatum aller Dateien, die er liest, rund tausend Stück in
-etwa 50 Millisekunden. Stimmen sie mit dem Stand des letzten Einlesens
-überein, passiert nichts und die Oberfläche meldet „Keine Änderungen an den
-Daten".
+Damit ein Klick nicht jedes Mal einen minutenlangen Leselauf auslöst, prüft
+der Server zuerst Größe und Änderungsdatum aller Dateien, die er liest, rund
+tausend Stück in etwa 50 Millisekunden. Stimmen sie mit dem Stand des letzten
+Einlesens überein, passiert nichts und die Verwaltung meldet „Keine Änderungen
+an den Daten".
 
 Klicken mehrere Personen gleichzeitig, entsteht trotzdem nur ein Ladevorgang:
 wer währenddessen klickt, wartet auf den laufenden mit, statt einen zweiten
 anzustoßen.
 
 Hat eine Kopie Größe und Zeitstempel erhalten, sodass die Prüfung die Änderung
-nicht sieht, hilft:
+nicht sieht, hilft das Häkchen **„Erzwingen"** in der Verwaltung, oder:
 
 ```bash
-curl -X POST "http://localhost:5175/api/reload?force=true"
+curl -u admin:PASSWORT -X POST "http://localhost:5176/api/reload?force=true"
 ```
+
+## Verwaltung
+
+Eine eigene Oberfläche (Vue) unter **http://localhost:5177**, hinter Benutzer
+`admin` und dem Passwort aus `KIAS_ADMIN_PASSWORD`. Sie kann drei Dinge:
+
+- **Zustand** ansehen: geladen oder nicht, Anzahl der Aktionen, Stand des
+  letzten Einlesens, Fortschritt während eines Ladelaufs.
+- **Datenpfad** setzen. `Zugriff testen` sieht nach, ob unter dem Pfad
+  `Daten/`, `Update/` und `Formulare/` liegen, zählt die DBF-Dateien und liest
+  probeweise in eine hinein. Gespeichert wird erst, wenn diese Prüfung besteht;
+  danach liest der Server sofort neu ein.
+- **Neu einlesen**, mit oder ohne Erzwingen.
+
+Zwei Dinge, die dabei leicht zu übersehen sind:
+
+Der Pfad gilt **aus Sicht des Servers**. Im Container ist das der Ort, an den
+das Volume zeigt, also meist `/data`, und nicht der Laufwerksbuchstabe des
+Arbeitsplatzes. Ein Pfad, der im Container nicht existiert, fällt schon bei
+der Prüfung durch und wird gar nicht erst gespeichert.
+
+Der gespeicherte Pfad liegt in `kias-db` und gewinnt gegen `KIAS_DATA_DIR` aus
+der `.env`. Die `.env` bleibt die Vorgabe für den ersten Start und für den
+Fall, dass keine Datenbank läuft; die Verwaltung zeigt an, welche der beiden
+Quellen gerade gilt. Ohne Datenbank lässt sich der Pfad ansehen und testen,
+aber nicht speichern.
 
 ## Die Seite „Änderungen"
 
@@ -294,8 +443,8 @@ Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` ->
 
 ## Verbindung und Gesundheit
 
-Zwei kleine Endpunkte, die auch dann schon antworten, wenn die DBF-Dateien
-noch eingelesen werden. Beide hängen vor der 503-Sperre der Datenendpunkte.
+Kleine Endpunkte, die auch dann schon antworten, wenn die DBF-Dateien noch
+eingelesen werden. Sie hängen vor der 503-Sperre der Datenendpunkte.
 
 ### `GET /api/ping`
 
@@ -304,7 +453,7 @@ weitergeht. Winzig, rund 100 Bytes und zwei Millisekunden.
 
 ```json
 { "pong": true, "service": "neo-kias", "name": "Werkstatt Nord",
-  "version": "1.1.4-alpha", "loaded": false }
+  "version": "1.2.0", "loaded": false }
 ```
 
 `loaded: false` heißt: der Server lebt, liest aber noch. Die App kann die
@@ -325,7 +474,7 @@ Für Überwachung und Betrieb, nicht für die App. Antwortet **200** nur bei
 
 ```json
 {
-  "status": "ok", "service": "neo-kias", "version": "1.1.4-alpha",
+  "status": "ok", "service": "neo-kias", "version": "1.2.0",
   "uptimeSeconds": 30,
   "checks": {
     "dataRoot": { "ok": true, "detail": null },
@@ -335,12 +484,29 @@ Für Überwachung und Betrieb, nicht für die App. Antwortet **200** nur bei
 }
 ```
 
-Der Docker-Healthcheck benutzt diesen Endpunkt. Sobald die Schnittstelle
-einmal getrennt von der Suchoberfläche läuft, ist er die Stelle, an der ein
-vorgeschalteter Load Balancer fragt.
+Der Docker-Healthcheck des Dienstes `rest-kias` benutzt diesen Endpunkt, und
+ein vorgeschalteter Load Balancer fragt an derselben Stelle.
 
-Beide Endpunkte sind unauthentifiziert. Der Pfad der Datenwurzel steht
+### `GET /healthz`
+
+Lebt dieser Prozess? Ohne Datenzugriff, ohne Weiterleitung, deshalb außerhalb
+von `/api`. Der Web-Dienst prüft sich damit selbst: `/api/health` ginge bei ihm
+durch den Weiterleiter und meldete den Zustand der Schnittstelle statt den
+eigenen, wäre also während des Einlesens fälschlich krank.
+
+```json
+{ "ok": true, "role": "web" }
+```
+
+Alle drei Endpunkte sind unauthentifiziert. Der Pfad der Datenwurzel steht
 bewusst nicht darin, anders als bei `/api/status`.
+
+### Wenn die Schnittstelle fehlt
+
+Antwortet `rest-kias` nicht, liefert der Weiterleiter **502** mit
+`{"error":"upstream"}`. Bewusst nicht 503: das heißt in diesem Projekt „liest
+noch ein", und genau das soll die Oberfläche hier nicht glauben. Die Seite
+selbst bleibt erreichbar und fragt weiter nach, bis die Schnittstelle da ist.
 
 ## API
 
@@ -351,8 +517,13 @@ Spezifikation allein liegt unter `/api/docs/openapi.json`.
 
 - `GET /api/ping` – lebt der Server? Antwortet auch während des Einlesens
 - `GET /api/health` – benutzbar? 200 bei `ok`, sonst 503
-- `GET /api/status` – Ladezustand, Zähler, `rootOk`
-- `POST /api/reload` – Daten neu einlesen
+- `GET /healthz` – lebt dieser Prozess? Ohne Daten, ohne Weiterleitung
+- `GET /api/status` – Ladezustand, Zähler, `rootOk`, Herkunft des Pfads
+- `POST /api/reload` – Daten neu einlesen, mit Anmeldung
+- `POST /api/admin/login`, `/logout`, `GET /api/admin/session` – Anmeldung
+- `GET /api/admin/state` – alles, was die Verwaltung anzeigt
+- `POST /api/admin/data-root/test` – Zugriff auf einen Pfad prüfen
+- `PUT /api/admin/data-root` – Pfad speichern und neu einlesen
 - `GET /api/bulletins?q=&fz=&scode=&keyword=&yearFrom=&yearTo=&limit=&offset=`
 - `GET /api/bulletin/:code` – Volltext inklusive verknüpfter Daten
 - `GET /api/vehicles`, `GET /api/scodes`, `GET /api/updates`

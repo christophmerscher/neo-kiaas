@@ -1,21 +1,28 @@
 {
   "name": "neo-kias",
-  "version": "1.1.4-alpha",
+  "version": "1.2.0",
   "description": "Inoffizielle moderne Web-Oberfläche für die KIAS-Datenbank",
   "license": "MIT",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:api": "node -e \"process.env.KIAS_ROLE='api';require('./server.js')\"",
+    "start:web": "node -e \"process.env.KIAS_ROLE='web';require('./server.js')\"",
     "dev:server": "node server.js",
+    "start:admin": "node -e \"process.env.KIAS_ROLE='admin';require('./server.js')\"",
     "dev:web": "npm --prefix web run dev",
+    "dev:admin": "npm --prefix admin run dev",
     "build:web": "npm --prefix web run build",
-    "install:web": "npm --prefix web install"
+    "build:admin": "npm --prefix admin run build",
+    "install:web": "npm --prefix web install",
+    "install:admin": "npm --prefix admin install"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "dbffile": "^1.12.0",
     "express": "^5.2.1",
     "iconv-lite": "^0.7.2",
+    "pg": "^8.23.0",
     "pino": "^9.5.0",
     "pino-http": "^10.3.0",
     "pino-roll": "^3.0.0",

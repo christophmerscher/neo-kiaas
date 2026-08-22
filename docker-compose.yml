@@ -1,5 +1,23 @@
 # docker-compose.yml — neo-KIAS
 #
+# Vier Dienste, drei davon aus einem Image:
+#
+#   rest-kias   REST-Schnittstelle. Liest die DBF-Daten und beantwortet
+#               /api/*. Hier hängen die Datenträger, hier dauert der Start
+#               die bekannten ein bis zwei Minuten. Die App athena-KIAS
+#               spricht diesen Dienst direkt an.
+#   neo-kias    React-Oberfläche. Liefert das gebaute Bündel aus und reicht
+#               /api/* an rest-kias weiter, damit die Seite mit einer
+#               einzigen Herkunft auskommt. Startet in Sekunden und zeigt
+#               den Ladebildschirm, während rest-kias noch liest.
+#   admin-kias  Vue-Verwaltung: Datenpfad und Neu-Einlesen, hinter einem
+#               Passwort. Nur im Profil "admin".
+#   kias-db     Postgres für die Einstellungen, die die Verwaltung ändern
+#               darf. Nicht für die KIAS-Daten selbst, die bleiben in den
+#               DBF-Dateien. Ebenfalls nur im Profil "admin".
+#
+# Verwaltung ein oder aus: COMPOSE_PROFILES in der .env (siehe dort).
+#
 # The image is always built from the sources in this repository; there is
 # no pre-built image to pull. Configuration comes from a sibling .env file:
 # copy .env.example to .env and point KIAS_DATA_DIR at the folder holding
@@ -8,20 +26,23 @@
 #     docker compose up -d --build
 #
 services:
-  neo-kias:
+  # ── REST-Schnittstelle ────────────────────────────────────────────────
+  rest-kias:
     build:
       context: .
       dockerfile: Dockerfile
     # Local tag for the image built above. Nothing is pulled from a registry.
     image: neo-kias:local
-    container_name: neo-kias
+    container_name: rest-kias
     restart: unless-stopped
 
-    # Web UI + JSON API. Override the host-side port via HOST_PORT in .env.
+    # Direkter Zugang für die App und für andere Clients. Die Oberfläche
+    # braucht diesen Port nicht, sie geht durch das Compose-Netz.
     ports:
-      - "${HOST_PORT:-5175}:5175"
+      - "${API_PORT:-5176}:5175"
 
     environment:
+      KIAS_ROLE: api
       # Inside the container the data root is always /data and logs go to
       # /logs — the host paths are mapped via the volumes below.
       KIAS_ROOT: /data
@@ -39,7 +60,18 @@ services:
       KIAS_API_DOCS: "${KIAS_API_DOCS:-true}"
       # Anzeigename in der App, siehe /api/ping.
       KIAS_SERVER_NAME: "${KIAS_SERVER_NAME:-}"
+      # Verwaltung: schaltet /api/admin/* und damit auch das Neu-Einlesen
+      # frei. Auf "false" gibt es keinen Weg mehr, die Daten neu zu lesen.
+      KIAS_ADMIN: "${KIAS_ADMIN:-true}"
+      KIAS_ADMIN_PASSWORD: "${KIAS_ADMIN_PASSWORD:-}"
+      KIAS_ADMIN_SESSION_HOURS: "${KIAS_ADMIN_SESSION_HOURS:-8}"
+      # Einstellungen (bislang der Datenpfad). Ohne Datenbank gilt allein
+      # die .env, und die Verwaltung kann den Pfad nicht speichern.
+      DATABASE_URL: "${DATABASE_URL:-postgres://kias:${POSTGRES_PASSWORD:-kias}@kias-db:5432/kias}"
       LOG_DIR: /logs
+      # Eigene Datei je Dienst: zwei Prozesse dürfen nicht in dieselbe
+      # rotierende Datei schreiben.
+      LOG_FILE: rest-kias.log
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       LOG_MAX_SIZE: "${LOG_MAX_SIZE:-10m}"
       LOG_MAX_FILES: "${LOG_MAX_FILES:-14}"
@@ -75,3 +107,130 @@ services:
     # tmpfs so the container's writable layer stays small.
     tmpfs:
       - /tmp
+
+  # ── React-Oberfläche ──────────────────────────────────────────────────
+  neo-kias:
+    # Dasselbe Image wie oben; der zweite Bau ist ein Treffer im Cache.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: neo-kias:local
+    container_name: neo-kias
+    restart: unless-stopped
+
+    # Der Einstieg für Menschen. Bleibt auf 5175, damit Lesezeichen gelten.
+    ports:
+      - "${HOST_PORT:-5175}:5175"
+
+    environment:
+      KIAS_ROLE: web
+      # Dienstname aus diesem Compose-Netz, nicht vom Browser aufgelöst.
+      KIAS_API_URL: "${KIAS_API_URL:-http://rest-kias:5175}"
+      LOG_DIR: /logs
+      LOG_FILE: neo-kias.log
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      LOG_MAX_SIZE: "${LOG_MAX_SIZE:-10m}"
+      LOG_MAX_FILES: "${LOG_MAX_FILES:-14}"
+      LOG_FREQUENCY: "${LOG_FREQUENCY:-daily}"
+      LOG_STDOUT: "${LOG_STDOUT:-true}"
+      PORT: "5175"
+      HOST: "0.0.0.0"
+      NODE_ENV: production
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      - "${KIAS_LOG_DIR:-./logs}:/logs"
+
+    # Nur die Startreihenfolge, nicht "gesund": rest-kias meldet sich erst
+    # nach dem Einlesen gesund, die Oberfläche soll aber vorher schon den
+    # Ladebildschirm zeigen können.
+    depends_on:
+      - rest-kias
+
+    # Eigene Lebendprüfung. /api/health ginge durch den Weiterleiter und
+    # würde den Zustand von rest-kias melden.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5175/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    tmpfs:
+      - /tmp
+
+  # ── Verwaltung (Vue) ──────────────────────────────────────────────────
+  # Läuft nur mit COMPOSE_PROFILES=admin in der .env. Ohne sie gibt es
+  # keine Verwaltung und damit auch keinen Weg, die Daten neu einzulesen.
+  admin-kias:
+    profiles: ["admin"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: neo-kias:local
+    container_name: admin-kias
+    restart: unless-stopped
+
+    ports:
+      - "${ADMIN_PORT:-5177}:5175"
+
+    environment:
+      KIAS_ROLE: admin
+      KIAS_API_URL: "${KIAS_API_URL:-http://rest-kias:5175}"
+      LOG_DIR: /logs
+      LOG_FILE: admin-kias.log
+      LOG_LEVEL: "${LOG_LEVEL:-info}"
+      LOG_MAX_SIZE: "${LOG_MAX_SIZE:-10m}"
+      LOG_MAX_FILES: "${LOG_MAX_FILES:-14}"
+      LOG_FREQUENCY: "${LOG_FREQUENCY:-daily}"
+      LOG_STDOUT: "${LOG_STDOUT:-true}"
+      PORT: "5175"
+      HOST: "0.0.0.0"
+      NODE_ENV: production
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      - "${KIAS_LOG_DIR:-./logs}:/logs"
+
+    depends_on:
+      - rest-kias
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:5175/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    tmpfs:
+      - /tmp
+
+  # ── Einstellungen (Postgres) ──────────────────────────────────────────
+  # Hier liegt nur, was die Verwaltung verstellen darf, derzeit der
+  # Datenpfad. Die KIAS-Daten selbst bleiben in den DBF-Dateien.
+  # Absichtlich ohne Port nach außen: den braucht nur rest-kias, und der
+  # steht im selben Netz.
+  kias-db:
+    profiles: ["admin"]
+    image: postgres:16-alpine
+    container_name: kias-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: kias
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-kias}"
+      POSTGRES_DB: kias
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      - kias-db-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kias -d kias"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  kias-db-data:

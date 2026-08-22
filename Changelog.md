@@ -5,9 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] — 2026-08-22
 
 ### Added
+- Verwaltung als eigene Vue-Oberfläche (Dienst `admin-kias`, Port 5177),
+  hinter Benutzer `admin` und `KIAS_ADMIN_PASSWORD`; ohne Angabe gilt
+  „admin", worauf Start und Oberfläche hinweisen.
+- In der Verwaltung: Datenpfad setzen, Zugriff darauf prüfen (Daten/,
+  Update/, Formulare/, DBF-Zählung, Leseprobe) und neu einlesen.
+  Gespeichert wird nur ein Pfad, der die Prüfung besteht.
+- Postgres (`kias-db`) für die Einstellungen, die die Verwaltung ändern
+  darf. Die KIAS-Daten selbst bleiben in den DBF-Dateien. Ein dort
+  gespeicherter Pfad gewinnt gegen `KIAS_DATA_DIR`; ohne Datenbank gilt
+  weiter allein die `.env`.
+- `COMPOSE_PROFILES=admin` und `KIAS_ADMIN` schalten Verwaltung und
+  Datenbank zusammen ein oder aus.
+- `/api/admin/*` und die Rolle `KIAS_ROLE=admin`.
+- Das Debian-Skript richtet die neuen Dienste mit ein: es würfelt die
+  Passwörter für Verwaltung und Datenbank aus und zeigt das der
+  Verwaltung einmal an, kennt `--admin-password`, `--no-admin`,
+  `--api-port` und `--admin-port`, warnt vor belegten Ports und wartet
+  am Ende, bis die Dienste antworten. Ein zweiter Lauf ergänzt fehlende
+  Schlüssel in einer vorhandenen `.env`, ohne gesetzte Werte anzufassen.
+- Oberfläche und Schnittstelle laufen als zwei Dienste: `neo-kias` liefert
+  die React-Seite (Port 5175), `rest-kias` die REST-Schnittstelle
+  (Port 5176). Ein Image, `KIAS_ROLE` entscheidet.
+- Der Web-Dienst reicht `/api/*` an `KIAS_API_URL` weiter, damit die Seite
+  mit einer Herkunft auskommt und ohne CORS. Antwortet die Schnittstelle
+  nicht, kommt 502, nicht 503.
+- `GET /healthz`: Lebenszeichen ohne Daten und ohne Weiterleitung, für den
+  Healthcheck des Web-Containers.
+- `npm run start:api` und `npm run start:web` starten die Hälften einzeln.
 - `GET /api/ping`: winzige Lebendprüfung mit Dienstkennung, Name und
   Ladezustand. Die App prüft damit eine eingegebene Serveradresse.
 - `GET /api/health`: Zustand für Überwachung und Betrieb. 200 bei `ok`,
@@ -16,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `KIAS_SERVER_NAME` benennt den Server; ohne Angabe der Rechnername.
 
 ### Changed
+- „neu einlesen" ist aus der Suchoberfläche verschwunden und sitzt jetzt
+  in der Verwaltung. `POST /api/reload` verlangt dieselben Zugangsdaten;
+  ohne Verwaltung (`KIAS_ADMIN=false`) antwortet der Pfad mit 404.
+- `/api/status` nennt mit `rootSource`, ob der Datenpfad aus der `.env`
+  oder aus der Datenbank stammt.
 - Der Healthcheck in Dockerfile und Compose fragt `/api/health` statt
   `/api/status` nach Textstellen zu durchsuchen.
 - `Store.hasDataRoot()` beantwortet die Frage nach `Daten/` an einer
@@ -131,7 +164,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.1.4-alpha...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.0
 [1.1.4-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.4-alpha
 [1.1.3-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.3-alpha
 [1.1.2-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.2-alpha

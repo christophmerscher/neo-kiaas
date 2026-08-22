@@ -2,9 +2,14 @@
 # ----------------------------------------------------------------------------
 # neo-KIAS production image
 #
-# Two stages:
-#   1. web-build : install web/ deps, run "vite build" → web/dist
-#   2. runtime   : install only server prod deps, copy server code + dist
+# Drei Stufen:
+#   1. web-build   : install web/ deps, run "vite build" → web/dist
+#   2. admin-build : dasselbe für die Vue-Verwaltung → admin/dist
+#   3. runtime     : install only server prod deps, copy server code + dist
+#
+# Ein Image für alle Rollen. Beide Bündel zusammen sind wenige hundert
+# Kilobyte; ein eigenes Image je Oberfläche wäre mehr Bau und mehr Pflege
+# als es an Platz spart.
 # ----------------------------------------------------------------------------
 
 # ---- Stage 1: build the React/Vite frontend --------------------------------
@@ -19,7 +24,17 @@ RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
 
-# ---- Stage 2: lean production runtime --------------------------------------
+# ---- Stage 2: build the Vue admin UI ---------------------------------------
+FROM node:20-alpine AS admin-build
+WORKDIR /app/admin
+
+COPY admin/package.json admin/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY admin/ ./
+RUN npm run build
+
+# ---- Stage 3: lean production runtime --------------------------------------
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
@@ -36,10 +51,11 @@ RUN npm ci --omit=dev --no-audit --no-fund \
              node_modules/swagger-ui-dist/swagger-ui.js \
     && npm cache clean --force
 
-# Copy server code and the pre-built UI bundle from stage 1.
+# Copy server code and the pre-built UI bundles from the stages above.
 COPY server.js ./
 COPY lib/ ./lib/
 COPY --from=web-build /app/web/dist ./web/dist
+COPY --from=admin-build /app/admin/dist ./admin/dist
 
 # Pre-create the log directory with the right ownership so the unprivileged
 # user can write to it. If the host mounts a volume here, ownership comes
