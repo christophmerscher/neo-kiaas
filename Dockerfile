@@ -65,10 +65,9 @@ VOLUME ["/logs"]
 # Drop to the unprivileged "node" user that the base image already provides.
 USER node
 
-# Simple HTTP healthcheck against /api/status (returns "loaded": true once the
-# DBF data has been parsed into memory).
+# /api/health antwortet mit 200 nur dann, wenn die Daten geladen sind, und
+# sonst mit 503. Das erspart das Durchsuchen einer Antwort nach Textstellen.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
-  CMD wget -q -O- "http://127.0.0.1:${PORT}/api/status" 2>/dev/null \
-        | grep -q '"loaded":true' || exit 1
+  CMD wget -q -O /dev/null "http://127.0.0.1:${PORT}/api/health" || exit 1
 
 CMD ["node", "server.js"]

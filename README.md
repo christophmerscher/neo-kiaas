@@ -204,7 +204,7 @@ Vorrang vor der Datei.
 | `KIAS_ROOT` | eine Ebene über der App | Datenwurzel der Anwendung. Im Container setzt compose sie auf `/data`. Nur nötig, wenn sie von `KIAS_DATA_DIR` abweichen soll. |
 | `HOST_PORT` | `5175` | Port auf dem Host (nur Docker). |
 | `TZ` | `Europe/Berlin` | Zeitzone im Container. |
-| `KIAS_SERVER_NAME` | Rechnername | Name, unter dem sich der Server in der App meldet. Nützlich, wenn mehrere Server im Betrieb laufen. |
+| `KIAS_SERVER_NAME` | Rechnername | Name, unter dem sich der Server bei `/api/ping` meldet. Nützlich, wenn mehrere Server im Betrieb laufen. |
 
 Liegen die Daten auf einer Netzwerkfreigabe, wird diese auf dem Host gemountet
 und `KIAS_DATA_DIR` auf den Mountpoint gesetzt.
@@ -292,51 +292,55 @@ Der letzte bekannte Stand lässt sich weiterhin vollständig öffnen.
 Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` ->
 `WN003/26`).
 
-## Server finden und Verbindung prüfen
+## Verbindung und Gesundheit
 
-Die App athena-KIAS kennt die Adresse des Servers zunächst nicht. Dafür gibt
-es zwei Endpunkte, die auch dann schon antworten, wenn die DBF-Dateien noch
-eingelesen werden.
+Zwei kleine Endpunkte, die auch dann schon antworten, wenn die DBF-Dateien
+noch eingelesen werden. Beide hängen vor der 503-Sperre der Datenendpunkte.
 
 ### `GET /api/ping`
 
-Winzig und ohne Datenzugriff, 72 Bytes und rund zwei Millisekunden:
+Für die App athena-KIAS: prüft eine eingegebene Serveradresse, bevor es
+weitergeht. Winzig, rund 100 Bytes und zwei Millisekunden.
 
 ```json
-{ "pong": true, "service": "neo-kias", "version": "1.1.4-alpha", "loaded": false }
+{ "pong": true, "service": "neo-kias", "name": "Werkstatt Nord",
+  "version": "1.1.4-alpha", "loaded": false }
 ```
 
-Zwei Aufgaben: eine von Hand eingegebene Adresse prüfen, bevor die App
-weitergeht, und beim Absuchen eines Subnetzes die vielen Adressen schnell
-verwerfen, hinter denen nichts steckt. `loaded: false` heißt, der Server
-lebt, liest aber noch; die Datenendpunkte antworten so lange mit 503.
+`loaded: false` heißt: der Server lebt, liest aber noch. Die App kann die
+Adresse also übernehmen und so lange einen Ladehinweis zeigen, statt „keine
+Verbindung" zu melden. `service` unterscheidet einen neo-KIAS von einem
+beliebigen anderen Dienst, der auf demselben Port antwortet.
 
-### `GET /api/discover`
+### `GET /api/health`
 
-Sagt, wer da antwortet: Name, Version, Fähigkeiten, Ladezustand, die eigenen
-IPv4-Adressen und eine `instanceId`. Die Kennung ist über Neustarts stabil
-und unterscheidet zwei Installationen. Praktischer Nutzen: findet die App
-denselben Server unter mehreren Adressen, erkennt sie das an der gleichen
-`instanceId` und zeigt ihn nur einmal an.
+Für Überwachung und Betrieb, nicht für die App. Antwortet **200** nur bei
+`status: "ok"`, sonst **503**:
 
-Der Pfad der Datenwurzel steht bewusst **nicht** in der Antwort, anders als
-bei `/api/status`. Beide Endpunkte sind unauthentifiziert.
-
-### Wie die App den Server findet
-
-Ein HTTP-Endpunkt kann sich nicht selbst finden, wer ihn aufruft kennt die
-Adresse bereits. Das Finden passiert deshalb außerhalb von HTTP, und die
-beiden Endpunkte bestätigen anschließend den Fund:
-
-| Weg | Aufwand | Grenzen |
+| status | HTTP | Bedeutung |
 |---|---|---|
-| Gespeicherte Adresse aus dem letzten Start | keiner | nur wenn sich nichts geändert hat |
-| mDNS / DNS-SD (`_neokias._tcp`) | Bibliothek auf beiden Seiten | Docker braucht `network_mode: host`, iOS eine Berechtigung |
-| Subnetz absuchen mit `/api/ping` | nur clientseitig | nur das eigene /24 |
-| Adresse von Hand, geprüft per Ping | keiner | Benutzer muss sie kennen |
+| `ok` | 200 | Daten geladen, Server benutzbar |
+| `starting` | 503 | liest gerade ein |
+| `unhealthy` | 503 | unter der Datenwurzel fehlt `Daten/` |
 
-Gemessen auf einem gewöhnlichen Heimnetz: 254 Adressen mit 32 gleichzeitigen
-Anfragen und 800 ms Zeitlimit dauern **6,5 Sekunden**.
+```json
+{
+  "status": "ok", "service": "neo-kias", "version": "1.1.4-alpha",
+  "uptimeSeconds": 30,
+  "checks": {
+    "dataRoot": { "ok": true, "detail": null },
+    "data": { "ok": true, "loading": false, "bulletins": 12205,
+              "loadedAt": "2026-08-22T09:55:13.559Z" }
+  }
+}
+```
+
+Der Docker-Healthcheck benutzt diesen Endpunkt. Sobald die Schnittstelle
+einmal getrennt von der Suchoberfläche läuft, ist er die Stelle, an der ein
+vorgeschalteter Load Balancer fragt.
+
+Beide Endpunkte sind unauthentifiziert. Der Pfad der Datenwurzel steht
+bewusst nicht darin, anders als bei `/api/status`.
 
 ## API
 
@@ -346,7 +350,7 @@ Spezifikation allein liegt unter `/api/docs/openapi.json`.
 
 
 - `GET /api/ping` – lebt der Server? Antwortet auch während des Einlesens
-- `GET /api/discover` – Name, Version, Kennung, Adressen
+- `GET /api/health` – benutzbar? 200 bei `ok`, sonst 503
 - `GET /api/status` – Ladezustand, Zähler, `rootOk`
 - `POST /api/reload` – Daten neu einlesen
 - `GET /api/bulletins?q=&fz=&scode=&keyword=&yearFrom=&yearTo=&limit=&offset=`
