@@ -49,27 +49,18 @@ Compose startet vier Container, drei davon aus einem Image:
 
 | Dienst | Aufgabe | Port auf dem Host |
 |---|---|---|
-| `neo-kias` | React-Suchoberfläche für Menschen. Liefert das gebaute Bündel aus und reicht `/api/*` an `rest-kias` weiter. | `5175` (`HOST_PORT`) |
+| `neo-kias` | Suchmaschine für KIAS Daten  | `5175` (`HOST_PORT`) |
 | `rest-kias` | REST-Schnittstelle. Liest die DBF-Daten, beantwortet `/api/*`. Einstieg für die App athena-KIAS. | `5176` (`API_PORT`) |
-| `admin-kias` | Vue-Verwaltung: Datenpfad und Neu-Einlesen, hinter einem Passwort. Nur im Profil `admin`. | `5177` (`ADMIN_PORT`) |
-| `kias-db` | Postgres für die Einstellungen, die die Verwaltung ändern darf. Nur im Profil `admin`. | keiner |
+| `admin-kias` | Verwaltungsoberfläche | `5177` (`ADMIN_PORT`) |
+| `kias-db` | Postgres für die Einstellungen. | keiner |
 
 Die Daten hängen nur am Dienst `rest-kias`; er allein braucht das Volume und
 die ein bis zwei Minuten zum Einlesen. Die Oberflächen starten in Sekunden und
 zeigen so lange ihren Ladebildschirm.
 
 In `kias-db` liegen **nicht** die KIAS-Daten. Die bleiben in den DBF-Dateien
-und im Speicher von `rest-kias`. Die Datenbank hält nur, was die Verwaltung
-verstellen darf, und das ist bisher der Datenpfad.
-
-Dass die Oberfläche die Aufrufe weiterreicht, statt den Browser direkt zur
-Schnittstelle zu schicken, hat einen Grund: das React-Bündel spricht seine
-Endpunkte relativ an (`/api/bulletins`). Eine absolute Adresse müsste beim
-Bauen feststehen, bräuchte CORS und einen zweiten offenen Port für jeden
-Browser. So bleibt für die Seite alles eine Herkunft.
-
-Wer beides in einem Prozess will, wie bisher, setzt `KIAS_ROLE=all`; das ist
-die Voreinstellung außerhalb von Compose und damit das, was `npm start` tut.
+und im Speicher von `rest-kias`. Die Datenbank hält nur, was in der Verwaltungsoberfläche
+eingestellt werrden darf.
 
 ## Installation auf Debian
 
@@ -109,9 +100,7 @@ chmod +x scripts/install-debian.sh
 ```
 
 Danach läuft die Suche auf **http://SERVER:5175**, die Verwaltung auf
-**http://SERVER:5177** und die Schnittstelle auf **http://SERVER:5176**. Das
-erste Einlesen dauert je nach Datenträger bis zu zwei Minuten, solange zeigt
-die Seite einen Ladebildschirm mit Fortschritt.
+**http://SERVER:5177** und die Schnittstelle auf **http://SERVER:5176**.
 
 Das Passwort der Verwaltung steht am Ende des Laufs auf dem Bildschirm.
 Es wird zufällig erzeugt, damit auf einem erreichbaren Server nicht die
