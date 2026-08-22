@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `GET /api/ping`: winzige Lebendprüfung (72 Bytes) für die App. Prüft eine
+  von Hand eingegebene Adresse und taugt zum Absuchen eines Subnetzes.
+- `GET /api/discover`: Name, Version, Fähigkeiten, Ladezustand und die
+  eigenen IPv4-Adressen, dazu eine über Neustarts stabile `instanceId`,
+  an der die App denselben Server unter mehreren Adressen erkennt.
+- Beide hängen vor der 503-Sperre und antworten deshalb auch, während die
+  DBF-Dateien noch eingelesen werden.
+- `KIAS_SERVER_NAME` benennt den Server für die App; ohne Angabe der
+  Rechnername.
+
+### Changed
+- `Store.hasDataRoot()` beantwortet die Frage nach `Daten/` jetzt an einer
+  Stelle; `/api/status` und `/api/discover` können nicht auseinanderlaufen.
+
 ## [1.1.4-alpha] — 2026-08-14
 
 ### Changed
