@@ -43,25 +43,6 @@ Beim Start werden die Basisdateien gelesen und anschließend alle update Dateien
 der Reihe nach angewendet. Das dauert je nach Datenträger einige Sekunden bis
 gut eine Minute; solange zeigt die Oberfläche einen Ladebildschirm.
 
-## Aufbau: vier Dienste
-
-Compose startet vier Container, drei davon aus einem Image:
-
-| Dienst | Aufgabe | Port auf dem Host |
-|---|---|---|
-| `neo-kias` | Suchmaschine für KIAS Daten  | `5175` (`HOST_PORT`) |
-| `rest-kias` | REST-Schnittstelle. Liest die DBF-Daten, beantwortet `/api/*`. Einstieg für die App athena-KIAS. | `5176` (`API_PORT`) |
-| `admin-kias` | Verwaltungsoberfläche | `5177` (`ADMIN_PORT`) |
-| `kias-db` | Postgres für die Einstellungen. | keiner |
-
-Die Daten hängen nur am Dienst `rest-kias`; er allein braucht das Volume und
-die ein bis zwei Minuten zum Einlesen. Die Oberflächen starten in Sekunden und
-zeigen so lange ihren Ladebildschirm.
-
-In `kias-db` liegen **nicht** die KIAS-Daten. Die bleiben in den DBF-Dateien
-und im Speicher von `rest-kias`. Die Datenbank hält nur, was in der Verwaltungsoberfläche
-eingestellt werrden darf.
-
 ## Installation auf Debian
 
 Für einen Server, auf dem neo-KIAS dauerhaft laufen soll, gibt es ein
@@ -131,16 +112,14 @@ systemctl status neo-kias
 journalctl -u neo-kias -f
 ```
 
-Das Skript ist wiederholbar: ein zweiter Lauf aktualisiert den Code und baut
+Das Skript kanmn erneut ausgeführt werden. Ein zweiter Lauf aktualisiert den Code und baut
 das Image neu, eingestellte Werte in der `.env` und die Logs bleiben
-unangetastet, Passwörter werden nicht neu gewürfelt. Das Datenverzeichnis wird
+unangetastet, Passwörter werden nicht neu eerstellt. Das Datenverzeichnis wird
 aus der bestehenden `.env` übernommen, `--data-dir` ist also nur beim ersten
 Mal nötig.
 
 Kommt in einer neuen Fassung ein Schlüssel dazu, ergänzt ihn der nächste Lauf
-in der vorhandenen `.env` und sagt, welche es waren. Eine Installation aus der
-Zeit vor der Verwaltung bekommt so `COMPOSE_PROFILES`, `KIAS_ADMIN` und ein
-frisch erzeugtes Passwort, ohne dass jemand die Datei von Hand nachzieht.
+in der vorhandenen `.env` und sagt, welche es waren.
 
 Wurde nur die Konfiguration geändert, genügt ein Neustart des Dienstes. Nach
 einer Änderung am Code baut `reload` das Image neu:
@@ -171,10 +150,8 @@ Bauen und starten:
 docker compose up -d --build
 ```
 
-Die Suche läuft dann auf **http://localhost:5175**, die Schnittstelle auf
-**http://localhost:5176**, die Verwaltung auf **http://localhost:5177**. Die
-drei Container werden aus demselben Image gebaut, der zweite und dritte Bau
-sind Treffer im Cache.
+Die neo-kias Webapp läuft dann auf **http://localhost:5175**, die Schnittstelle auf
+**http://localhost:5176**, die Verwaltung auf **http://localhost:5177**.
 
 Beim ersten Aufruf der Verwaltung meldet man sich mit `admin` an; das Passwort
 steht in `KIAS_ADMIN_PASSWORD`, ohne Angabe ist es ebenfalls `admin`.
@@ -196,89 +173,6 @@ docker compose restart neo-kias
 ```bash
 docker compose down
 ```
-
-## Starten mit npm
-
-Voraussetzung ist Node.js 20 oder neuer.
-
-```bash
-npm install
-```
-
-```bash
-npm run install:web
-```
-
-```bash
-npm run build:web
-```
-
-Wer die Verwaltung braucht, baut ihr Bündel dazu:
-
-```bash
-npm run install:admin
-```
-
-```bash
-npm run build:admin
-```
-
-```bash
-npm start
-```
-
-Auch hier läuft die Oberfläche auf **http://localhost:5175**.
-
-Ohne weitere Angabe sucht die Anwendung die Daten **eine Ebene über dem
-Anwendungsverzeichnis**. Liegt das Repository woanders als die KIAS-Installation,
-was bei der Entwicklung der Normalfall ist, setzt man den Pfad entweder in der
-`.env` (`KIAS_ROOT`, ersatzweise `KIAS_DATA_DIR`) oder einmalig in der Shell:
-
-```bash
-$env:KIAS_ROOT = "C:\Users\me\Kias"; npm start
-```
-
-Zeigt die Datenwurzel ins Leere, meldet der Start eine Fehlerzeile im Log und
-`/api/status` liefert `rootOk: false`, statt eine leere Datenbank vorzutäuschen.
-
-Für die Entwicklung an der Oberfläche:
-
-```bash
-npm run dev:web
-```
-
-Vite läuft dann auf http://localhost:5173 und leitet `/api` an Port 5175
-weiter, oder an `KIAS_API_URL`, falls gesetzt.
-
-### Getrennt starten
-
-Dieselben Hälften wie in Compose, nur ohne Container. Je ein Terminal:
-
-```bash
-npm run start:api
-```
-
-```bash
-npm run start:web
-```
-
-```bash
-npm run start:admin
-```
-
-Der erste Prozess liest die Daten und bedient `/api`, der zweite liefert die
-Oberfläche aus. Beide wollen den Port aus der `.env`, einer braucht deshalb
-einen eigenen. Unter Windows:
-
-```bash
-$env:PORT = "5176"; npm run start:api
-```
-
-```bash
-$env:KIAS_API_URL = "http://localhost:5176"; npm run start:web
-```
-
-Unter Linux und macOS entsprechend `PORT=5176 npm run start:api`.
 
 ## Konfiguration
 
