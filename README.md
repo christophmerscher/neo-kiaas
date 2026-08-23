@@ -248,37 +248,16 @@ das Volume sofort im Container sichtbar. Danach die Daten neu einlesen, in der
 
 Ein Neustart ist nicht nötig.
 
-Aus der Suchoberfläche ist der Knopf verschwunden. Sie läuft ohne Anmeldung,
-also sah ihn jeder, der die Seite offen hatte; ein Leselauf betrifft aber alle
-Benutzer gleichzeitig. Für Skripte geht es weiter über die Schnittstelle,
-jetzt mit Zugangsdaten:
-
-```bash
-curl -u admin:PASSWORT -X POST http://localhost:5176/api/reload
-```
-
 ### Wann wirklich gelesen wird
 
 Damit ein Klick nicht jedes Mal einen minutenlangen Leselauf auslöst, prüft
-der Server zuerst Größe und Änderungsdatum aller Dateien, die er liest, rund
-tausend Stück in etwa 50 Millisekunden. Stimmen sie mit dem Stand des letzten
-Einlesens überein, passiert nichts und die Verwaltung meldet „Keine Änderungen
-an den Daten".
-
-Klicken mehrere Personen gleichzeitig, entsteht trotzdem nur ein Ladevorgang:
-wer währenddessen klickt, wartet auf den laufenden mit, statt einen zweiten
-anzustoßen.
-
-Hat eine Kopie Größe und Zeitstempel erhalten, sodass die Prüfung die Änderung
-nicht sieht, hilft das Häkchen **„Erzwingen"** in der Verwaltung, oder:
-
-```bash
-curl -u admin:PASSWORT -X POST "http://localhost:5176/api/reload?force=true"
-```
+der Server zuerst Größe und Änderungsdatum aller Dateien, die er liest. Stimmen 
+sie mit dem Stand des letzten Einlesens überein, passiert nichts und die Verwaltung
+meldet „Keine Änderungen an den Daten".
 
 ## Verwaltung
 
-Eine eigene Oberfläche (Vue) unter **http://localhost:5177**, hinter Benutzer
+Eine eigene Oberfläche unter **http://localhost:5177**, hinter Benutzer
 `admin` und dem Passwort aus `KIAS_ADMIN_PASSWORD`. Sie kann drei Dinge:
 
 - **Zustand** ansehen: geladen oder nicht, Anzahl der Aktionen, Stand des
@@ -288,19 +267,6 @@ Eine eigene Oberfläche (Vue) unter **http://localhost:5177**, hinter Benutzer
   probeweise in eine hinein. Gespeichert wird erst, wenn diese Prüfung besteht;
   danach liest der Server sofort neu ein.
 - **Neu einlesen**, mit oder ohne Erzwingen.
-
-Zwei Dinge, die dabei leicht zu übersehen sind:
-
-Der Pfad gilt **aus Sicht des Servers**. Im Container ist das der Ort, an den
-das Volume zeigt, also meist `/data`, und nicht der Laufwerksbuchstabe des
-Arbeitsplatzes. Ein Pfad, der im Container nicht existiert, fällt schon bei
-der Prüfung durch und wird gar nicht erst gespeichert.
-
-Der gespeicherte Pfad liegt in `kias-db` und gewinnt gegen `KIAS_DATA_DIR` aus
-der `.env`. Die `.env` bleibt die Vorgabe für den ersten Start und für den
-Fall, dass keine Datenbank läuft; die Verwaltung zeigt an, welche der beiden
-Quellen gerade gilt. Ohne Datenbank lässt sich der Pfad ansehen und testen,
-aber nicht speichern.
 
 ## Die Seite „Änderungen"
 
@@ -323,92 +289,3 @@ den Grund, statt leer zu bleiben:
 Der letzte bekannte Stand lässt sich weiterhin vollständig öffnen.
 Umnummerierte Aktionen verweisen auf ihren neuen Code (`WN003/2026` ->
 `WN003/26`).
-
-## Verbindung und Gesundheit
-
-Kleine Endpunkte, die auch dann schon antworten, wenn die DBF-Dateien noch
-eingelesen werden. Sie hängen vor der 503-Sperre der Datenendpunkte.
-
-### `GET /api/ping`
-
-Für die App athena-KIAS: prüft eine eingegebene Serveradresse, bevor es
-weitergeht. Winzig, rund 100 Bytes und zwei Millisekunden.
-
-```json
-{ "pong": true, "service": "neo-kias", "name": "Werkstatt Nord",
-  "version": "1.2.0", "loaded": false }
-```
-
-`loaded: false` heißt: der Server lebt, liest aber noch. Die App kann die
-Adresse also übernehmen und so lange einen Ladehinweis zeigen, statt „keine
-Verbindung" zu melden. `service` unterscheidet einen neo-KIAS von einem
-beliebigen anderen Dienst, der auf demselben Port antwortet.
-
-### `GET /api/health`
-
-Für Überwachung und Betrieb, nicht für die App. Antwortet **200** nur bei
-`status: "ok"`, sonst **503**:
-
-| status | HTTP | Bedeutung |
-|---|---|---|
-| `ok` | 200 | Daten geladen, Server benutzbar |
-| `starting` | 503 | liest gerade ein |
-| `unhealthy` | 503 | unter der Datenwurzel fehlt `Daten/` |
-
-```json
-{
-  "status": "ok", "service": "neo-kias", "version": "1.2.0",
-  "uptimeSeconds": 30,
-  "checks": {
-    "dataRoot": { "ok": true, "detail": null },
-    "data": { "ok": true, "loading": false, "bulletins": 12205,
-              "loadedAt": "2026-08-22T09:55:13.559Z" }
-  }
-}
-```
-
-Der Docker-Healthcheck des Dienstes `rest-kias` benutzt diesen Endpunkt, und
-ein vorgeschalteter Load Balancer fragt an derselben Stelle.
-
-### `GET /healthz`
-
-Lebt dieser Prozess? Ohne Datenzugriff, ohne Weiterleitung, deshalb außerhalb
-von `/api`. Der Web-Dienst prüft sich damit selbst: `/api/health` ginge bei ihm
-durch den Weiterleiter und meldete den Zustand der Schnittstelle statt den
-eigenen, wäre also während des Einlesens fälschlich krank.
-
-```json
-{ "ok": true, "role": "web" }
-```
-
-Alle drei Endpunkte sind unauthentifiziert. Der Pfad der Datenwurzel steht
-bewusst nicht darin, anders als bei `/api/status`.
-
-### Wenn die Schnittstelle fehlt
-
-Antwortet `rest-kias` nicht, liefert der Weiterleiter **502** mit
-`{"error":"upstream"}`. Bewusst nicht 503: das heißt in diesem Projekt „liest
-noch ein", und genau das soll die Oberfläche hier nicht glauben. Die Seite
-selbst bleibt erreichbar und fragt weiter nach, bis die Schnittstelle da ist.
-
-## API
-
-Die Endpunkte sind unter **http://localhost:5175/api/docs** interaktiv
-dokumentiert (Swagger UI, abschaltbar über `KIAS_API_DOCS`). Die
-Spezifikation allein liegt unter `/api/docs/openapi.json`.
-
-
-- `GET /api/ping` – lebt der Server? Antwortet auch während des Einlesens
-- `GET /api/health` – benutzbar? 200 bei `ok`, sonst 503
-- `GET /healthz` – lebt dieser Prozess? Ohne Daten, ohne Weiterleitung
-- `GET /api/status` – Ladezustand, Zähler, `rootOk`, Herkunft des Pfads
-- `POST /api/reload` – Daten neu einlesen, mit Anmeldung
-- `POST /api/admin/login`, `/logout`, `GET /api/admin/session` – Anmeldung
-- `GET /api/admin/state` – alles, was die Verwaltung anzeigt
-- `POST /api/admin/data-root/test` – Zugriff auf einen Pfad prüfen
-- `PUT /api/admin/data-root` – Pfad speichern und neu einlesen
-- `GET /api/bulletins?q=&fz=&scode=&keyword=&yearFrom=&yearTo=&limit=&offset=`
-- `GET /api/bulletin/:code` – Volltext inklusive verknüpfter Daten
-- `GET /api/vehicles`, `GET /api/scodes`, `GET /api/updates`
-- `GET /api/history` – Änderungen je Update
-- `GET /api/forms/:file` – Formular ausliefern
