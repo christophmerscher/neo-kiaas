@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `scripts/install-windows.ps1` samt Starter `install-windows.bat`: das
+  Gegenstück zum Debian-Skript für Windows 11. Prüft Docker Desktop
+  (Angebot zur Installation über winget), kopiert nach `C:\neo-kias`,
+  erzeugt die `.env` samt Passwörtern, baut das Image, legt eine geplante
+  Aufgabe für den Start bei der Anmeldung an und wartet, bis die Dienste
+  antworten. Gleiche Optionen wie unter Debian, in
+  PowerShell-Schreibweise.
+- `.gitattributes` hält `.bat` und `.ps1` auf CRLF.
+
 ## [1.2.0] — 2026-08-22
 
 ### Added

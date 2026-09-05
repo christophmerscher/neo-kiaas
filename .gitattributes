@@ -3,6 +3,12 @@
 # Skript scheitert mit "bad interpreter: No such file or directory".
 *.sh text eol=lf
 
+# Umgekehrt bei Windows: cmd.exe verarbeitet eine .bat mit LF unzuverlässig,
+# Sprungmarken laufen dann ins Leere. Die .ps1 liegt als UTF-8 mit BOM vor,
+# sonst liest Windows PowerShell 5.1 sie als ANSI und zerlegt die Umlaute.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
 # Dockerfile und Compose werden ebenfalls von Linux-Werkzeugen gelesen.
 Dockerfile text eol=lf
 *.yml text eol=lf
