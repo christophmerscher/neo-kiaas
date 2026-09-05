@@ -78,80 +78,12 @@ function Write-Ok   { param([string] $Text) Write-Host "  ok $Text" -ForegroundC
 function Write-Warn { param([string] $Text) Write-Host "Warnung: $Text" -ForegroundColor Yellow }
 function Stop-Setup { param([string] $Text) Write-Host "Fehler: $Text" -ForegroundColor Red; exit 1 }
 
-# ── .env lesen und schreiben ───────────────────────────────────────────────
+# ── Gemeinsame Helfer ──────────────────────────────────────────────────────
 #
-# Werte werden nie in Anfuehrungszeichen geschrieben: docker compose nimmt
-# sie sonst als Teil des Wertes mit.
-
-function Get-EnvValue {
-    param([string] $Key)
-    if (-not (Test-Path -LiteralPath $EnvFile)) { return '' }
-    $line = Select-String -LiteralPath $EnvFile -Pattern "^$([regex]::Escape($Key))=" |
-            Select-Object -Last 1
-    if ($null -eq $line) { return '' }
-    return $line.Line.Substring($Key.Length + 1)
-}
-
-# Zahl aus der .env, mit Rueckfallwert wenn dort nichts Brauchbares steht.
-function Get-EnvPort {
-    param([string] $Key, [int] $Fallback)
-    $value = Get-EnvValue $Key
-    if ($value -match '^\s*(\d+)\s*$') { return [int] $Matches[1] }
-    return $Fallback
-}
-
-function Test-EnvKey {
-    param([string] $Key)
-    if (-not (Test-Path -LiteralPath $EnvFile)) { return $false }
-    return [bool] (Select-String -LiteralPath $EnvFile -Pattern "^$([regex]::Escape($Key))=" -Quiet)
-}
-
-# Ueberschreiben, oder anhaengen falls der Schluessel fehlt.
-#
-# Geschrieben wird ausdruecklich ohne Byte Order Mark. "Set-Content -Encoding
-# UTF8" setzt in Windows PowerShell eines an den Anfang, und ein BOM vor der
-# ersten Zeile macht deren Schluessel fuer docker compose unlesbar.
-function Set-EnvValue {
-    param([string] $Key, [string] $Value)
-    if (Test-EnvKey $Key) {
-        $lines = @(Get-Content -LiteralPath $EnvFile)
-        $out = foreach ($line in $lines) {
-            if ($line -match "^$([regex]::Escape($Key))=") { "$Key=$Value" } else { $line }
-        }
-        [System.IO.File]::WriteAllLines(
-            $EnvFile, [string[]] $out, (New-Object System.Text.UTF8Encoding($false)))
-    } else {
-        Add-Content -LiteralPath $EnvFile -Value "$Key=$Value"
-    }
-}
-
-# Nur anhaengen, wenn der Schluessel noch gar nicht vorkommt. Damit wird eine
-# .env aus einer aelteren Fassung vollstaendig, ohne dass eingestellte Werte
-# verlorengehen.
-function Set-EnvDefault {
-    param([string] $Key, [string] $Value)
-    if (Test-EnvKey $Key) { return }
-    Add-Content -LiteralPath $EnvFile -Value "$Key=$Value"
-    $script:AddedKeys += $Key
-}
-
-# Passwort ohne Sonderzeichen: es landet in einer .env und in einer
-# Verbindungsadresse, und an beiden Stellen waeren Schraegstriche oder
-# Anfuehrungszeichen ein eigenes Problem.
-function New-Secret {
-    $alphabet = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    $bytes = [byte[]]::new(24)
-    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
-    -join ($bytes | ForEach-Object { $alphabet[$_ % $alphabet.Length] })
-}
-
-# Docker Desktop nimmt Pfade mit Schraegstrichen entgegen und stolpert nicht
-# ueber Rueckstriche in der .env, die compose sonst als Escape lesen koennte.
-function ConvertTo-ComposePath {
-    param([string] $Path)
-    return ($Path -replace '\\', '/').TrimEnd('/')
-}
+# Die .env-Helfer teilt sich dieses Skript mit der MSI. Beide muessen die
+# Datei gleich anlegen und ergaenzen, sonst laufen die Ergebnisse der beiden
+# Installationswege auseinander.
+. (Join-Path $ScriptDir 'KiasEnv.ps1')
 
 function Test-PortBusy {
     param([int] $PortNumber)
@@ -265,66 +197,38 @@ Write-Ok 'Dateien kopiert'
 
 # ── .env ───────────────────────────────────────────────────────────────────
 
-$freshEnv = $false
-if (Test-Path -LiteralPath $EnvFile) {
-    Write-Ok '.env vorhanden, eingestellte Werte bleiben'
-} else {
-    $example = Join-Path $InstallDir '.env.example'
-    if (-not (Test-Path -LiteralPath $example)) { Stop-Setup '.env.example fehlt, .env kann nicht erzeugt werden.' }
-    Copy-Item -LiteralPath $example -Destination $EnvFile
-    $freshEnv = $true
-}
+$freshEnv = -not (Test-Path -LiteralPath $EnvFile)
+if (-not $freshEnv) { Write-Ok '.env vorhanden, eingestellte Werte bleiben' }
 
-Set-EnvValue 'KIAS_DATA_DIR' $DataDir
+$hadPassword = [bool] (Get-EnvValue 'KIAS_ADMIN_PASSWORD')
+
+# Anlegen, ergaenzen, Passwoerter wuerfeln. Dieselbe Routine benutzt die MSI.
+$script:GeneratedAdminPassword = Initialize-KiasEnv `
+    -DataDir $DataDir `
+    -ExampleFile (Join-Path $InstallDir '.env.example') `
+    -AdminPassword $AdminPassword `
+    -NoAdmin:$NoAdmin
+
+if ($NoAdmin) {
+    Write-Step 'Ohne Verwaltung (-NoAdmin): kein Weg, die Daten neu einzulesen.'
+} elseif ($AdminPassword) {
+    Write-Ok 'Passwort der Verwaltung aus -AdminPassword uebernommen'
+} elseif ($script:GeneratedAdminPassword) {
+    Write-Ok 'Passwort der Verwaltung erzeugt'
+} elseif ($hadPassword) {
+    Write-Ok 'Passwort der Verwaltung bleibt, wie es in der .env steht'
+}
 
 # Angegebene Optionen gewinnen, alles andere bleibt, wie es war.
 if ($Port -gt 0)      { Set-EnvValue 'HOST_PORT'  "$Port" }
 if ($ApiPort -gt 0)   { Set-EnvValue 'API_PORT'   "$ApiPort" }
 if ($AdminPort -gt 0) { Set-EnvValue 'ADMIN_PORT' "$AdminPort" }
 
-# Schluessel, die es in aelteren Fassungen noch nicht gab.
-Set-EnvDefault 'HOST_PORT'  '5175'
-Set-EnvDefault 'API_PORT'   '5176'
-Set-EnvDefault 'ADMIN_PORT' '5177'
-
 # Unter Windows gibt es keine uid 1000: Docker Desktop reicht Bind-Mounts
 # ohne Rechtepruefung durch. Das Verzeichnis muss nur existieren.
 New-Item -ItemType Directory -Force -Path (Join-Path $InstallDir 'logs') | Out-Null
 
-# ── Verwaltung und ihre Datenbank ──────────────────────────────────────────
-#
-# Zwei Schalter, die zusammengehoeren: das Compose-Profil startet die
-# Container admin-kias und kias-db, KIAS_ADMIN gibt /api/admin/* in
-# rest-kias frei. Nur eines von beiden ergaebe entweder eine Oberflaeche vor
-# verschlossener Tuer oder eine offene Tuer ohne Oberflaeche.
-if ($NoAdmin) {
-    Set-EnvValue 'COMPOSE_PROFILES' ''
-    Set-EnvValue 'KIAS_ADMIN' 'false'
-    Write-Step 'Ohne Verwaltung (-NoAdmin): kein Weg, die Daten neu einzulesen.'
-} else {
-    Set-EnvDefault 'COMPOSE_PROFILES' 'admin'
-    Set-EnvDefault 'KIAS_ADMIN' 'true'
-}
-
 $adminOn = Get-EnvValue 'COMPOSE_PROFILES'
-
-if ($adminOn) {
-    if ($AdminPassword) {
-        Set-EnvValue 'KIAS_ADMIN_PASSWORD' $AdminPassword
-        Write-Ok 'Passwort der Verwaltung aus -AdminPassword uebernommen'
-    } elseif (-not (Get-EnvValue 'KIAS_ADMIN_PASSWORD')) {
-        $script:GeneratedAdminPassword = New-Secret
-        Set-EnvValue 'KIAS_ADMIN_PASSWORD' $script:GeneratedAdminPassword
-        Write-Ok 'Passwort der Verwaltung erzeugt'
-    } else {
-        Write-Ok 'Passwort der Verwaltung bleibt, wie es in der .env steht'
-    }
-
-    $pg = Get-EnvValue 'POSTGRES_PASSWORD'
-    if (-not $pg -or $pg -eq 'kias') { Set-EnvValue 'POSTGRES_PASSWORD' (New-Secret) }
-}
-
-Set-EnvDefault 'KIAS_ADMIN_SESSION_HOURS' '8'
 
 if ($freshEnv) {
     Write-Ok ".env aus .env.example erzeugt (KIAS_DATA_DIR=$DataDir)"

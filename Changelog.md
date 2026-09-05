@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-09-05
+
 ### Added
 - `scripts/install-windows.ps1` samt Starter `install-windows.bat`: das
   Gegenstück zum Debian-Skript für Windows 11. Prüft Docker Desktop
@@ -16,6 +18,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   antworten. Gleiche Optionen wie unter Debian, in
   PowerShell-Schreibweise.
 - `.gitattributes` hält `.bat` und `.ps1` auf CRLF.
+- Installationspaket `installer\`: eine MSI (WiX 5), Herausgeber
+  fMerscher, Produkt neo-KIAS. Zeigt die MIT-Lizenz samt
+  Haftungsausschluss und verlangt die Zustimmung, fragt das
+  Datenverzeichnis ab und lässt erst weiter, wenn dort ein `Daten`-Ordner
+  mit lesbaren DBF-Dateien liegt, sucht Docker Desktop, legt die `.env`
+  an und richtet den Windows-Dienst `neo-KIAS` ein.
+- Der Dienst wartet auf die Docker-Engine, ohne Zeitlimit, baut beim
+  ersten Start das Abbild und hält die Container am Leben. Protokoll
+  unter `%ProgramData%\neo-KIAS\service.log`.
+- Docker Desktop ist Voraussetzung und wird nicht mehr mitinstalliert.
+  Fehlt es, nennt ein eigenes Fenster die Bezugsquelle, öffnet auf Wunsch
+  die Seite von Docker und sieht auf Knopfdruck noch einmal nach. Grund
+  für die Kehrtwende: Docker verlangt WSL 2, eingeschaltete
+  Virtualisierung und einen Neustart, und in einer virtuellen Maschine
+  ohne verschachtelte Virtualisierung läuft es überhaupt nicht. Eine
+  Viertelstunde Wartezeit, an deren Ende trotzdem nichts läuft, hilft
+  niemandem.
+- Das Fortschrittsfenster sagt, was gerade passiert, statt eine leere
+  Statuszeile zu zeigen.
+- Das Abschlussfenster nennt es beim Namen, wenn Docker fehlt, statt nur
+  eine erfolgreich abgeschlossene Installation zu melden.
+- `scripts\KiasEnv.ps1`: die Helfer für die `.env` liegen jetzt an einer
+  Stelle und werden vom PowerShell-Installer wie von der MSI benutzt.
+
+### Changed
+- `scripts\install-windows.ps1` holt sich diese Helfer aus `KiasEnv.ps1`,
+  statt eine zweite Fassung davon zu führen.
+- Das Bauverzeichnis `installer\build\` bleibt aus der Versionsverwaltung
+  heraus.
 
 ## [1.2.0] — 2026-08-22
 
@@ -176,7 +207,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.1
 [1.2.0]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.0
 [1.1.4-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.4-alpha
 [1.1.3-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.3-alpha

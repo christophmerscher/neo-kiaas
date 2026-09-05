@@ -1,0 +1,74 @@
+neo-KIAS
+
+Herausgeber: fMerscher
+Lizenz: MIT
+
+Diese Software ist eine inoffizielle Erweiterung und steht in keiner
+Verbindung zu Ford, der Ford Werke GmbH oder einem ihrer Tochterunternehmen,
+Partner oder Lieferanten. Markennamen sind Eigentum der jeweiligen
+Rechteinhaber.
+
+
+HAFTUNGSAUSSCHLUSS
+
+Die Software wird ohne jegliche Gewährleistung bereitgestellt. Die Nutzung
+erfolgt vollständig auf eigene Gefahr. Der Herausgeber haftet in keinem Fall
+für Schäden gleich welcher Art, die aus der Nutzung oder der Unmöglichkeit
+der Nutzung dieser Software entstehen. Das gilt ausdrücklich auch für:
+
+  Fehlbedienung der Software durch den Benutzer.
+
+  Fehlerhafte, unvollständige oder veraltete Daten, gleich ob sie aus der
+  KIAS Datenbank stammen oder von dieser Software erzeugt wurden.
+
+  Daten, die diese Software oder eine ihrer Komponenten gelöscht,
+  verändert oder unbrauchbar gemacht hat. Die Software liest die
+  Datenbestände ausschliesslich lesend ein, ein Datenverlust ist damit
+  nicht beabsichtigt, aber auch nicht ausgeschlossen.
+
+  Suchergebnisse, die unvollständig sind, fehlen oder nicht der Anfrage
+  entsprechen, sowie Angaben, die fälschlich angezeigt werden.
+
+  Reparaturen, Diagnosen oder Entscheidungen, die auf Angaben dieser
+  Software beruhen, samt aller daraus folgenden Sach-, Vermögens- und
+  Personenschäden.
+
+  Mittelbare Schäden, Folgeschäden, entgangenen Gewinn, Betriebsausfall
+  und Datenverlust.
+
+Maßgeblich sind stets die offiziellen Unterlagen des Herstellers. Diese
+Software ersetzt sie nicht und erhebt keinen Anspruch auf Richtigkeit oder
+Vollständigkeit der angezeigten Angaben.
+
+
+MIT LICENSE
+
+Copyright (c) 2026 fMerscher
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+MITGELIEFERTE BESTANDTEILE
+
+Diese Installation richtet Docker Desktop ein, falls es fehlt, und baut
+daraus Container. Für Docker Desktop und die verwendeten Abbilder gelten
+die Lizenzbedingungen ihrer jeweiligen Anbieter.
+
+Wer diese Installation fortsetzt, erklärt sich mit den obigen Bedingungen
+einverstanden. Wer nicht einverstanden ist, bricht die Installation ab.

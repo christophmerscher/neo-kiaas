@@ -1,0 +1,337 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  neo-KIAS als MSI.
+
+  Was das Paket tut:
+    1. Lizenz zeigen und die Zustimmung verlangen, sonst geht es nicht weiter
+    2. Zielverzeichnis wählen lassen
+    3. Datenverzeichnis abfragen und pruefen; ohne gültige KIAS-Daten
+       kommt man aus dem Dialog nicht heraus
+    4. Docker Desktop suchen und, falls es fehlt, deutlich sagen, dass es
+       zuerst gebraucht wird, mit Verweis auf die Bezugsquelle
+    5. Dateien ablegen, .env erzeugen, den Dienst neo-KIAS einrichten
+
+  Docker Desktop wird bewusst nicht mitinstalliert. Es braucht WSL 2,
+  aktivierte Virtualisierung und einen Neustart, und in einer virtuellen
+  Maschine ohne verschachtelte Virtualisierung laeuft es gar nicht. Diese
+  Voraussetzungen kann ein Installationsprogramm nicht zuverlaessig
+  herstellen; es kann sie nur pruefen und benennen.
+
+  Das Bauen des Docker-Abbilds und das Starten der Container macht der
+  Dienst beim ersten Start, nicht die Installation. Grund: bei einer eben
+  erst nachinstallierten Docker-Umgebung läuft die Engine noch gar nicht,
+  und eine Installation, die zwanzig Minuten auf einen Container wartet,
+  wuerde jeder abbrechen.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="neo-KIAS"
+           Manufacturer="fMerscher"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="55524388-AFDE-4F27-AF4E-E3CFDFDF72E0"
+           Scope="perMachine"
+           Language="1031"
+           Codepage="1252">
+
+    <SummaryInformation Description="neo-KIAS, Weboberfläche fuer die KIAS-Datenbank"
+                        Manufacturer="fMerscher" />
+
+    <!-- Eine neuere Fassung ersetzt die aeltere, ohne dass jemand vorher
+         deinstallieren muss. Die .env bleibt dabei liegen. -->
+    <MajorUpgrade DowngradeErrorMessage="Es ist bereits eine neuere Fassung von neo-KIAS installiert." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Property Id="ARPHELPLINK" Value="https://github.com/christophmerscher/neo-kiaas" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+
+    <!-- ── Eigenschaften ──────────────────────────────────────────────── -->
+
+    <!-- KIASDATADIR steht weiter unten als Verzeichnis, nicht als einfache
+         Eigenschaft: der Durchsuchen-Dialog von Windows Installer kann nur
+         Verzeichnisse anzeigen und bricht bei allem anderen mit 2343 ab.
+         Der aufgeraeumte Pfad ohne Schraegstrich am Ende kommt aus der
+         Pruefung, siehe KIASDATADIR_CLEAN. -->
+    <Property Id="KIASDATADIR_CLEAN" Secure="yes" />
+    <Property Id="KIASDATADIR_VALID" Value="0" Secure="yes" />
+    <Property Id="KIASDATADIR_PROBLEM" Value="Kein Pfad geprüft." />
+    <Property Id="DOCKER_PRESENT" Value="0" Secure="yes" />
+    <!-- Fuer stille Installationen: ADMINPASSWORD=... auf der Befehlszeile.
+         Ohne Angabe wuerfelt die Konfiguration eines. -->
+    <Property Id="ADMINPASSWORD" Secure="yes" />
+
+    <!-- ── Verzeichnisse ──────────────────────────────────────────────── -->
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="neo-KIAS">
+        <Directory Id="ServiceFolder" Name="service" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Angelegt wird dieses Verzeichnis nicht, es haengt keine Komponente
+         daran; es ist nur der Startpunkt fuer die Auswahl. -->
+    <StandardDirectory Id="TARGETDIR">
+      <Directory Id="KIASDATADIR" Name="Kias" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationMenuFolder" Name="neo-KIAS" />
+    </StandardDirectory>
+
+    <SetProperty Id="KIASDATADIR" Value="[WindowsVolume]Kias" Sequence="both"
+                 Before="CostFinalize" Condition="NOT KIASDATADIR" />
+
+    <!-- ── Was installiert wird ───────────────────────────────────────── -->
+
+    <Feature Id="Main" Title="neo-KIAS" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="ProjectFiles" />
+      <ComponentGroupRef Id="ServiceGroup" />
+      <ComponentGroupRef Id="ShortcutGroup" />
+    </Feature>
+
+    <!-- Der Dienst haelt den Docker-Stapel am Leben. Verzoegerter
+         Automatikstart, weil vor Docker Desktop ohnehin nichts geht. -->
+    <ComponentGroup Id="ServiceGroup">
+      <Component Id="ServiceComponent" Directory="ServiceFolder" Guid="D42BE891-6D65-4D94-B5D8-DA934B9C7B60">
+        <File Id="NeoKiasServiceExe" Source="$(var.ServiceExe)" KeyPath="yes" />
+        <ServiceInstall Id="NeoKiasServiceInstall"
+                        Name="neo-KIAS"
+                        DisplayName="neo-KIAS"
+                        Description="Startet und stoppt die Container von neo-KIAS."
+                        Type="ownProcess"
+                        Start="auto"
+                        Account="LocalSystem"
+                        ErrorControl="normal"
+                        Vital="yes" />
+        <ServiceControl Id="NeoKiasServiceControl"
+                        Name="neo-KIAS"
+                        Start="install"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="no" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Verknüpfungen im Startmenü. Als .url-Dateien, weil eine
+         Verknuepfung im Sinne von MSI auf eine Datei zeigen muss und nicht
+         auf eine Adresse. Die Ports darin sind die Vorgaben; wer sie in der
+         .env aendert, ruft die Seite eben unter dem neuen Port auf. -->
+    <ComponentGroup Id="ShortcutGroup">
+      <!-- Schluesselpfad ist ein Registrierungswert und keine der beiden
+           Dateien. Windows Installer verlangt das fuer alles, was im
+           Startmenü landet, und mit einem Wert als Anker duerfen beide
+           Dateien in einer Komponente liegen. -->
+      <Component Id="ShortcutComponent" Directory="ApplicationMenuFolder" Guid="B6E0AC5D-32D4-46DE-9678-4C14FC3C72CC">
+        <File Id="UrlSearch" Source="$(var.UrlSearch)" Name="neo-KIAS Suche.url" />
+        <File Id="UrlAdmin" Source="$(var.UrlAdmin)" Name="neo-KIAS Verwaltung.url" />
+        <RemoveFolder Id="RemoveApplicationMenuFolder" Directory="ApplicationMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKLM" Key="Software\fMerscher\neo-KIAS"
+                       Name="Verknuepfungen" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- ── Custom Actions ─────────────────────────────────────────────── -->
+
+    <Binary Id="KiasCustomActions" SourceFile="$(var.CustomActionsJs)" />
+
+    <CustomAction Id="CheckDataDir" BinaryRef="KiasCustomActions"
+                  JScriptCall="CheckDataDir" Execute="immediate" Return="check" />
+    <CustomAction Id="CheckDocker" BinaryRef="KiasCustomActions"
+                  JScriptCall="CheckDocker" Execute="immediate" Return="check" />
+    <CustomAction Id="CleanPaths" BinaryRef="KiasCustomActions"
+                  JScriptCall="CleanPaths" Execute="immediate" Return="check" />
+    <CustomAction Id="ExitText" BinaryRef="KiasCustomActions"
+                  JScriptCall="ExitText" Execute="immediate" Return="ignore" />
+    <CustomAction Id="OpenDockerPage" BinaryRef="KiasCustomActions"
+                  JScriptCall="OpenDockerPage" Execute="immediate" Return="ignore" />
+
+    <!-- Type 19: bricht mit Meldung ab. Faengt die stille Installation,
+         die keinen Dialog durchlaufen hat. -->
+    <CustomAction Id="ErrorNoDataDir" Error="Unter KIASDATADIR liegt keine KIAS-Datenbank. Erwartet wird ein Verzeichnis, das die Ordner Daten, Update und Formulare enthält. Aufruf: msiexec /i neo-KIAS.msi KIASDATADIR=C:\Kias" />
+
+    <!-- .env schreiben. Muss gelingen, sonst startet nichts. -->
+    <SetProperty Id="ConfigureKias" Sequence="execute" Before="ConfigureKias"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER_CLEAN]\installer\msi-configure.ps1&quot; -InstallDir &quot;[INSTALLFOLDER_CLEAN]&quot; -DataDir &quot;[KIASDATADIR_CLEAN]&quot; -AdminPassword &quot;[ADMINPASSWORD]&quot;" />
+    <CustomAction Id="ConfigureKias" DllEntry="WixQuietExec64" BinaryRef="Wix4UtilCA_X64"
+                  Execute="deferred" Impersonate="no" Return="check" />
+
+    <!-- Beim Deinstallieren die Container anhalten, bevor die Dateien
+         verschwinden. Ohne Volumes zu loeschen: darin stehen die
+         Einstellungen der Verwaltung. -->
+    <SetProperty Id="StopContainers" Sequence="execute" Before="StopContainers"
+                 Value="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -ExecutionPolicy Bypass -Command &quot;Set-Location '[INSTALLFOLDER_CLEAN]'; docker compose down&quot;" />
+    <CustomAction Id="StopContainers" DllEntry="WixQuietExec64" BinaryRef="Wix4UtilCA_X64"
+                  Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <InstallUISequence>
+      <Custom Action="CheckDocker" After="CostFinalize" Condition="NOT Installed" />
+      <!-- Nach der Installation, damit der letzte Satz zum Ergebnis passt. -->
+      <Custom Action="ExitText" After="ExecuteAction" Condition="NOT Installed" />
+      <Custom Action="CleanPaths" After="CheckDocker" />
+    </InstallUISequence>
+
+    <InstallExecuteSequence>
+      <!-- Auch ohne Oberflaeche pruefen: eine stille Installation soll
+           nicht mit einem falschen Pfad durchlaufen. -->
+      <Custom Action="CheckDataDir" Before="ErrorNoDataDir" Condition="NOT Installed" />
+      <Custom Action="ErrorNoDataDir" Before="CostFinalize"
+              Condition="NOT Installed AND KIASDATADIR_VALID &lt;&gt; &quot;1&quot;" />
+      <Custom Action="CheckDocker" After="CostFinalize" Condition="NOT Installed" />
+      <Custom Action="CleanPaths" After="CheckDocker" />
+
+      <Custom Action="StopContainers" Before="StopServices" Condition="Installed AND (REMOVE=&quot;ALL&quot;)" />
+      <Custom Action="ConfigureKias" After="InstallFiles" Condition="NOT Installed" />
+    </InstallExecuteSequence>
+
+    <!-- ── Oberflaeche ────────────────────────────────────────────────── -->
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+
+    <UI>
+      <!-- Was im Fortschrittsfenster hinter „Status:" steht. Ohne diese
+           Zeilen bleibt es dort leer, und ein Schritt, der Minuten
+           braucht, sieht aus wie eine hängende Installation. -->
+      <ProgressText Action="ConfigureKias" Message="Konfiguration wird erzeugt und Passwörter werden vergeben." />
+      <ProgressText Action="StopContainers" Message="Laufende Container werden angehalten." />
+      <ProgressText Action="CheckDataDir" Message="Datenverzeichnis wird geprüft." />
+      <ProgressText Action="CheckDocker" Message="Es wird nach Docker Desktop gesucht." />
+      <ProgressText Action="CleanPaths" Message="Pfade werden vorbereitet." />
+
+      <!-- Abfrage des Datenverzeichnisses. Eigener Dialog, weil der
+           Standardsatz nur nach dem Programmverzeichnis fragt. -->
+      <Dialog Id="DataDirDlg" Width="370" Height="270" Title="[ProductName] einrichten">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="{\WixUI_Font_Title}Datenverzeichnis" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="330" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="Wo liegen die KIAS-Daten?" />
+
+        <Control Id="Explain" Type="Text" X="20" Y="60" Width="330" Height="40" NoPrefix="yes"
+                 Text="Gemeint ist das Verzeichnis, das die Ordner Daten, Update und Formulare enthält. Die Daten werden nur gelesen, nie verändert." />
+
+        <Control Id="FolderLabel" Type="Text" X="20" Y="108" Width="290" Height="13" NoPrefix="yes"
+                 Text="Pfad zum Datenverzeichnis:" />
+        <Control Id="Folder" Type="PathEdit" X="20" Y="124" Width="250" Height="18" Property="KIASDATADIR" Indirect="no" />
+        <Control Id="ChangeFolder" Type="PushButton" X="280" Y="123" Width="66" Height="20" Text="Durchsuchen">
+          <Publish Property="_BrowseProperty" Value="KIASDATADIR" Order="1" />
+          <Publish Event="SpawnDialog" Value="BrowseDlg" Order="2" />
+        </Control>
+
+        <Control Id="Hint" Type="Text" X="20" Y="152" Width="330" Height="60" NoPrefix="yes"
+                 Text="Beispiel: C:\Kias oder D:\Werkstatt\Kias. Bei einer Netzwerkfreigabe zuerst ein Laufwerk verbinden. Der Pfad wird geprüft, bevor es weitergeht." />
+
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Zurück">
+          <Publish Event="NewDialog" Value="InstallDirDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="Weiter">
+          <Publish Event="DoAction" Value="CheckDataDir" Order="1" />
+          <Publish Event="SpawnDialog" Value="InvalidDataDirDlg" Order="2"
+                   Condition="KIASDATADIR_VALID &lt;&gt; &quot;1&quot;" />
+          <Publish Event="NewDialog" Value="DockerInfoDlg" Order="3"
+                   Condition="KIASDATADIR_VALID = &quot;1&quot; AND DOCKER_PRESENT = &quot;0&quot;" />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="4"
+                   Condition="KIASDATADIR_VALID = &quot;1&quot; AND DOCKER_PRESENT = &quot;1&quot;" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Abbrechen">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- Meldung bei unbrauchbarem Pfad. Der Text kommt aus der Pruefung,
+           damit hier steht, was genau fehlt. -->
+      <Dialog Id="InvalidDataDirDlg" Width="280" Height="120" Title="[ProductName]" NoMinimize="yes">
+        <Control Id="Text" Type="Text" X="20" Y="15" Width="240" Height="60" NoPrefix="yes"
+                 Text="[KIASDATADIR_PROBLEM]" />
+        <Control Id="Return" Type="PushButton" X="112" Y="90" Width="56" Height="17" Default="yes"
+                 Cancel="yes" Text="OK">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+
+      <!-- Docker Desktop fehlt. Erscheint nur dann, und sagt, was der
+           Benutzer selbst tun muss.
+
+           Frueher hat die Installation Docker an dieser Stelle geladen und
+           still eingerichtet. Das ist wieder heraus: Docker Desktop braucht
+           WSL 2, eingeschaltete Virtualisierung und einen Neustart, und in
+           einer virtuellen Maschine ohne verschachtelte Virtualisierung
+           laeuft es ueberhaupt nicht. Eine halbe Stunde Wartezeit, an deren
+           Ende trotzdem nichts laeuft, ist schlechter als ein klarer Satz
+           samt Bezugsquelle. -->
+      <Dialog Id="DockerInfoDlg" Width="370" Height="270" Title="[ProductName] einrichten">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44"
+                 TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="250" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="{\WixUI_Font_Title}Docker Desktop fehlt" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="330" Height="15" Transparent="yes"
+                 NoPrefix="yes" Text="Voraussetzung, bitte zuerst installieren." />
+
+        <Control Id="Body" Type="Text" X="20" Y="58" Width="330" Height="130" NoPrefix="yes"
+                 Text="neo-KIAS läuft in Containern und braucht dafür Docker Desktop. Auf diesem Rechner wurde keines gefunden.&#13;&#10;&#13;&#10;Bitte Docker Desktop von docker.com herunterladen, installieren und einmal starten. Docker verlangt seinerseits WSL 2 und eingeschaltete Virtualisierung; sein eigenes Installationsprogramm richtet das ein und verlangt danach einen Neustart. In einer virtuellen Maschine muss die verschachtelte Virtualisierung eingeschaltet sein, sonst startet Docker nicht.&#13;&#10;&#13;&#10;https://www.docker.com/products/docker-desktop/" />
+
+        <Control Id="OpenPage" Type="PushButton" X="20" Y="192" Width="120" Height="17"
+                 Text="Docker-Seite öffnen">
+          <Publish Event="DoAction" Value="OpenDockerPage" />
+        </Control>
+        <Control Id="Recheck" Type="PushButton" X="148" Y="192" Width="120" Height="17"
+                 Text="Erneut prüfen">
+          <Publish Event="DoAction" Value="CheckDocker" Order="1" />
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" Order="2"
+                   Condition="DOCKER_PRESENT = &quot;1&quot;" />
+          <Publish Event="SpawnDialog" Value="DockerStillMissingDlg" Order="3"
+                   Condition="DOCKER_PRESENT = &quot;0&quot;" />
+        </Control>
+
+        <Control Id="Hint" Type="Text" X="20" Y="214" Width="330" Height="18" NoPrefix="yes"
+                 Text="Weiter geht es auch ohne: die Dateien und der Dienst werden eingerichtet, und der Dienst startet neo-KIAS, sobald Docker da ist." />
+
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Zurück">
+          <Publish Event="NewDialog" Value="DataDirDlg" />
+        </Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="Weiter">
+          <Publish Event="NewDialog" Value="VerifyReadyDlg" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Abbrechen">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <!-- Antwort auf „Erneut prüfen", wenn immer noch nichts da ist. -->
+      <Dialog Id="DockerStillMissingDlg" Width="280" Height="120" Title="[ProductName]" NoMinimize="yes">
+        <Control Id="Text" Type="Text" X="20" Y="15" Width="240" Height="60" NoPrefix="yes"
+                 Text="Docker Desktop wurde immer noch nicht gefunden. Gesucht wird nach C:\Program Files\Docker\Docker\Docker Desktop.exe." />
+        <Control Id="Return" Type="PushButton" X="112" Y="90" Width="56" Height="17" Default="yes"
+                 Cancel="yes" Text="OK">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+
+      <!-- Einhaengen in den Standardablauf: nach dem Zielverzeichnis kommt
+           das Datenverzeichnis, nicht gleich die Zusammenfassung. Die
+           hoehere Ordnungszahl gewinnt gegen die eingebaute Zeile. -->
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="DataDirDlg" Order="10"
+               Condition="WIXUI_DONTVALIDATEPATH OR WIXUI_INSTALLDIR_VALID=&quot;1&quot;" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="DataDirDlg" Order="10"
+               Condition="DOCKER_PRESENT = &quot;1&quot;" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="DockerInfoDlg" Order="11"
+               Condition="DOCKER_PRESENT = &quot;0&quot;" />
+    </UI>
+
+    <!-- Abschlusstext. Eine Eigenschaft und keine WixVariable: das
+         Steuerelement des Abschlussfensters zeigt genau diese hier, eine
+         Variable hatte es nie erreicht. Den endgültigen Wortlaut setzt die
+         Aktion ExitText, je nachdem ob Docker inzwischen da ist; das hier
+         ist der Text für den Fall, dass sie nicht zum Zuge kommt. -->
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT"
+              Value="Die Suche läuft auf http://localhost:5175, die Verwaltung auf http://localhost:5177 (Benutzer admin). Das Passwort steht in der Datei .env im Installationsverzeichnis unter KIAS_ADMIN_PASSWORD. Der Dienst neo-KIAS baut beim ersten Start das Docker-Abbild, das dauert einige Minuten; der Fortschritt steht in %ProgramData%\neo-KIAS\service.log." />
+
+  </Package>
+</Wix>

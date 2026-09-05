@@ -3,6 +3,7 @@ web/node_modules/
 web/dist/
 admin/node_modules/
 admin/dist/
+installer/build/
 
 # Local config and runtime data
 .env

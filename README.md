@@ -128,6 +128,70 @@ einer Änderung am Code baut `reload` das Image neu:
 systemctl reload neo-kias
 ```
 
+## Installation auf Windows 11
+
+Dasselbe für einen Windows-Rechner, als PowerShell-Skript mit einem
+Batch-Starter davor. Voraussetzung ist Docker Desktop; fehlt es, bietet das
+Skript die Installation über `winget` an und bittet danach um einen zweiten
+Aufruf, weil Docker Desktop erst starten muss.
+
+Im Explorer genügt ein Rechtsklick auf `scripts\install-windows.bat` und
+"Als Administrator ausführen". Der Starter fragt die Rechte notfalls selbst
+an und reicht alle Argumente an das PowerShell-Skript weiter. Aus einer
+Eingabeaufforderung heraus:
+
+```bash
+scripts\install-windows.bat -DataDir C:\Kias
+```
+
+Die Arbeit selbst macht `install-windows.ps1`, aufrufbar auch direkt:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1 -DataDir C:\Kias
+```
+
+Es kopiert nach `C:\neo-kias`, legt die `.env` an, würfelt die Passwörter
+aus, baut das Image, registriert eine geplante Aufgabe für den Start bei der
+Anmeldung und wartet am Ende, bis die Dienste antworten. Die Optionen heißen
+wie unter Debian, nur in PowerShell-Schreibweise: `-DataDir`, `-Port`,
+`-ApiPort`, `-AdminPort`, `-AdminPassword`, `-NoAdmin`, `-SkipDocker`,
+`-NoStart`, dazu `-InstallDir` für ein anderes Zielverzeichnis.
+
+Ein Unterschied, der sich nicht wegkonfigurieren lässt: Docker Desktop ist
+kein Dienst, sondern eine Anwendung. Der Stapel läuft nur, solange ein
+Benutzer angemeldet ist, und startet nach einem Neustart erst mit dessen
+Anmeldung. Für einen Rechner, der unbeaufsichtigt durchläuft, ist die
+Debian-Installation die bessere Wahl. Rechte am Datenverzeichnis sind unter
+Windows dafür kein Thema, Docker Desktop reicht Bind-Mounts ohne
+Rechteprüfung durch.
+
+### Als MSI
+
+Wer lieber ein richtiges Installationspaket möchte, baut sich eines:
+
+```bash
+powershell -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+Heraus kommt `installer\build\neo-KIAS.msi`, Herausgeber **fMerscher**,
+Produktname **neo-KIAS**. Das Paket zeigt die Lizenz und verlangt die
+Zustimmung, fragt Ziel- und Datenverzeichnis ab und lässt nicht weiter,
+solange unter dem Datenpfad keine lesbare KIAS-Datenbank liegt.
+
+**Docker Desktop muss vorher da sein**, die MSI installiert es nicht mit.
+Fehlt es, sagt ein Hinweisfenster das und nennt die Bezugsquelle; die
+Installation läuft trotzdem durch, und der Dienst startet neo-KIAS, sobald
+Docker vorhanden ist. Der Grund für diese Aufteilung: Docker verlangt WSL 2,
+eingeschaltete Virtualisierung und einen Neustart, in einer virtuellen
+Maschine zusätzlich verschachtelte Virtualisierung. Das kann kein
+Installationsprogramm zuverlässig herstellen.
+
+Statt einer geplanten Aufgabe richtet die MSI einen Windows-Dienst
+`neo-KIAS` ein, der beim Hochfahren startet, auf die Docker-Engine wartet,
+beim ersten Mal das Abbild baut und die Container startet.
+
+Alles Weitere dazu steht in [installer/README.md](./installer/README.md).
+
 ## Starten mit Docker
 
 Es gibt kein vorgefertigtes Image, gebaut wird immer aus diesem Repository.
