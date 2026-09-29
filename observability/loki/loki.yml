@@ -1,0 +1,60 @@
+# Loki für neo-KIAS.
+#
+# Eine einzelne Instanz auf dem Dateisystem, kein Cluster, kein
+# Objektspeicher. Das reicht für drei Container in einer Werkstatt um
+# Längen und hat den Vorteil, dass nichts davon gepflegt werden muss.
+#
+# Ohne Anmeldung: Loki hängt an keinem Port nach außen, erreichbar ist es
+# nur aus dem Compose-Netz, und dort sind allein Alloy und Grafana. Ein
+# Passwort davor wäre eines, das niemand kennt und niemand braucht.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  # Loki redet sonst über jede einzelne Anfrage. Das Protokoll der
+  # Protokollsammlung braucht niemand.
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # Aufbewahrung. 30 Tage sind lang genug, um einem Fehler von letzter
+  # Woche nachzugehen, und kurz genug, dass die Platte es nicht merkt.
+  retention_period: ${LOKI_RETENTION:-720h}
+  # Ältere Einträge nicht abweisen: nach einem Neustart oder einer Pause
+  # des Sammlers kommen Zeilen nach, die sonst verlorengingen.
+  reject_old_samples: false
+  allow_structured_metadata: true
+  volume_enabled: true
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  # Ohne diese Zeile wird die Aufbewahrung oben nur verwaltet und nie
+  # durchgesetzt, und die Platte läuft langsam voll.
+  retention_enabled: true
+
+# Kein Nachhausetelefonieren von einem Werkstattrechner.
+analytics:
+  reporting_enabled: false

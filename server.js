@@ -153,15 +153,16 @@ function main() {
     .catch(err => logger.error({ err: err.message }, 'resolving the data root failed'))
     .then(() => {
       checkDataRoot(location);
-      return store.load();
+      return store.load({ trigger: 'startup' });
     })
     .then(() => {
       const { aktion } = store.counts();
       if (!aktion) {
         logger.error(
-          { root: location.root },
+          { root: location.root, read: store.lastRead ? store.lastRead.toLog() : null },
           'data load finished with 0 bulletins — check that the data root points '
-          + 'at the folder containing Daten/, Update/ and Formulare/.',
+          + 'at the folder containing Daten/, Update/ and Formulare/. '
+          + (store.lastRead ? store.lastRead.summary : ''),
         );
         return;
       }

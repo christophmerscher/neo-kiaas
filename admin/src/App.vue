@@ -11,6 +11,7 @@ import { api } from './api.js';
 import LoginView from './components/LoginView.vue';
 import StatusCard from './components/StatusCard.vue';
 import DataRootCard from './components/DataRootCard.vue';
+import ReadReportCard from './components/ReadReportCard.vue';
 import ReloadCard from './components/ReloadCard.vue';
 
 /** null = noch unbekannt, dann zeigt die Seite nichts Halbes. */
@@ -83,6 +84,7 @@ onBeforeUnmount(() => clearTimeout(timer));
 
     <StatusCard :state="state" />
     <DataRootCard :state="state" @changed="refresh" />
+    <ReadReportCard :state="state" />
     <ReloadCard :state="state" @changed="refresh" />
 
     <div class="footer">

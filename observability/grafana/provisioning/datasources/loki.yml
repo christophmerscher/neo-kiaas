@@ -1,0 +1,17 @@
+# Die Datenquelle wird beim Start eingerichtet, nicht von Hand geklickt.
+# Wer die Verwaltung neu aufsetzt, soll nicht erst eine Adresse eintippen
+# müssen, die ohnehin feststeht.
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://kias-loki:3100
+    isDefault: true
+    jsonData:
+      # Loki hält die Protokolle, mehr nicht. Ohne diese Grenze fragt
+      # Grafana bei weiten Zeiträumen mehr an, als der eine Container
+      # beantworten kann.
+      maxLines: 2000

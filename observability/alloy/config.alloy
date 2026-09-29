@@ -1,0 +1,85 @@
+// Grafana Alloy: sammelt die Protokolle und schiebt sie nach Loki.
+//
+// Diese Fassung liest die Container selbst über den Docker-Socket. Das
+// fängt mehr als die Protokolldateien: die Ausgabe von Postgres, und vor
+// allem das, was ein Container beim Abstürzen schreibt, bevor der eigene
+// Protokollierer überhaupt läuft. Genau danach sucht man hinterher.
+//
+// Ist der Socket nicht erreichbar, steht in der .env
+//   ALLOY_CONFIG=config-files.alloy
+// und Alloy liest stattdessen die rotierenden Dateien unter /logs.
+
+// ── Woher ──────────────────────────────────────────────────────────────
+
+discovery.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "15s"
+}
+
+discovery.relabel "containers" {
+	targets = discovery.docker.containers.targets
+
+	// Der Containername kommt mit führendem Schrägstrich an.
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/?(.*)"
+		target_label  = "service"
+	}
+
+	// Das Compose-Projekt als eigene Bezeichnung, damit sich auf einem
+	// Rechner mit mehreren Projekten trennen lässt.
+	rule {
+		source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+		target_label  = "project"
+	}
+}
+
+loki.source.docker "containers" {
+	host       = "unix:///var/run/docker.sock"
+	targets    = discovery.relabel.containers.output
+	labels     = {job = "docker"}
+	forward_to = [loki.process.kias.receiver]
+}
+
+// ── Aufbereiten ────────────────────────────────────────────────────────
+
+loki.process "kias" {
+	// neo-KIAS schreibt JSON (pino). Die Zeile bleibt unangetastet, hier
+	// werden nur ein paar Felder herausgezogen, aus denen Bezeichnungen
+	// werden. Alles Übrige holt LogQL zur Abfragezeit mit "| json";
+	// jede zusätzliche Bezeichnung kostet in Loki einen eigenen Strom.
+	stage.json {
+		expressions = {
+			level = "level",
+			app   = "app",
+		}
+	}
+
+	// pino schreibt Zahlen: 30 ist info, 50 ist error. Ein Mensch, der
+	// nach Fehlern sucht, tippt aber "error".
+	stage.template {
+		source   = "severity"
+		template = "{{ if eq .level \"10\" }}trace{{ else if eq .level \"20\" }}debug{{ else if eq .level \"30\" }}info{{ else if eq .level \"40\" }}warn{{ else if eq .level \"50\" }}error{{ else if eq .level \"60\" }}fatal{{ else }}other{{ end }}"
+	}
+
+	stage.labels {
+		values = {
+			severity = "",
+		}
+	}
+
+	forward_to = [loki.write.default.receiver]
+}
+
+// ── Wohin ──────────────────────────────────────────────────────────────
+
+loki.write "default" {
+	endpoint {
+		url = "http://kias-loki:3100/loki/api/v1/push"
+	}
+}
+
+logging {
+	level  = "warn"
+	format = "logfmt"
+}

@@ -1,0 +1,16 @@
+# Die mitgelieferte Übersicht wird beim Start eingelesen. Änderungen
+# daran lassen sich in Grafana speichern; die Datei im Projekt bleibt
+# davon unberührt und ist beim nächsten Aufsetzen wieder der Ausgangspunkt.
+apiVersion: 1
+
+providers:
+  - name: neo-KIAS
+    orgId: 1
+    folder: neo-KIAS
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

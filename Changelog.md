@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-09-29
+
+### Added
+- Protokollsammlung als eigenes Compose-Profil `logs`: Grafana Alloy
+  sammelt ein, Loki bewahrt auf (30 Tage, einstellbar), Grafana zeigt an
+  (Port 5178). Angemeldet wird sich mit `admin` und
+  `KIAS_ADMIN_PASSWORD`, also denselben Zugangsdaten wie bei der
+  Verwaltung. Eine fertige Übersicht ist dabei: Ladeläufe mit ihrem
+  Ergebnis, Datensätze beim letzten Lesen, Dauer, nicht gelesene
+  Dateien, Fehler je Dienst, Zugriffe auf die Verwaltung. Ab Werk aus,
+  die drei Container kosten rund 300 MB Arbeitsspeicher.
+- `scripts/install-debian.sh --with-logs` schaltet das Profil gleich mit
+  ein und nennt die Adresse in der Zusammenfassung.
+- Leseprotokoll: jeder Ladelauf hält fest, welche Verzeichnisse und
+  Basistabellen gefunden wurden, wie viele Datensätze daraus kamen und
+  woran die übrigen gescheitert sind, mitsamt errno-Kürzel. Das Ergebnis
+  steht im Protokoll des Dienstes, hängt am Store und kommt über
+  `/api/admin/state` in die Verwaltung.
+- Neue Karte „Letzter Lesevorgang" in der Verwaltung. Ein leerer Bestand
+  sagt jetzt selbst, warum er leer ist, statt nur „0 Aktionen" zu zeigen.
+- Jeder Ladelauf trägt seinen Auslöser (`startup`, `admin`, `api`,
+  `root-change`) im Protokoll. Damit ist später zu sehen, ob der leere
+  Bestand vom Start kam oder von einem Knopfdruck.
+- Fehlt unter Daten/ und Update/ jede Datei, steht das als Fehler im
+  Protokoll, bevor die erste Tabelle geöffnet wird. Bei einem
+  weggelaufenen Bind-Mount ist das die erste ehrliche Auskunft.
+
+### Fixed
+- Der DBF-Leser ließ bei einer Datei, die keine DBF-Datei ist, den
+  Dateizeiger offen: der Kopf wurde außerhalb des `try` gelesen, also lief
+  das `finally` mit dem `close` nie. Unter Windows bleibt die Datei damit
+  gesperrt, bis der Dienst endet, und ein Update, das sie ersetzen will,
+  kommt nicht an ihr vorbei.
+- Ein fehlendes oder unlesbares Verzeichnis unter dem Datenpfad wurde
+  stillschweigend übergangen. Jetzt steht in einer Zeile, ob es fehlt
+  oder ob die Rechte nicht reichen; das sind zwei verschiedene
+  Handgriffe.
+
 ## [1.2.1] — 2026-09-05
 
 ### Added
@@ -207,7 +245,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.3.0
 [1.2.1]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.1
 [1.2.0]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.0
 [1.1.4-alpha]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.1.4-alpha

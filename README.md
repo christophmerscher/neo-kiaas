@@ -322,7 +322,7 @@ meldet „Keine Änderungen an den Daten".
 ## Verwaltung
 
 Eine eigene Oberfläche unter **http://localhost:5177**, hinter Benutzer
-`admin` und dem Passwort aus `KIAS_ADMIN_PASSWORD`. Sie kann drei Dinge:
+`admin` und dem Passwort aus `KIAS_ADMIN_PASSWORD`. Sie kann vier Dinge:
 
 - **Zustand** ansehen: geladen oder nicht, Anzahl der Aktionen, Stand des
   letzten Einlesens, Fortschritt während eines Ladelaufs.
@@ -330,7 +330,80 @@ Eine eigene Oberfläche unter **http://localhost:5177**, hinter Benutzer
   `Daten/`, `Update/` und `Formulare/` liegen, zählt die DBF-Dateien und liest
   probeweise in eine hinein. Gespeichert wird erst, wenn diese Prüfung besteht;
   danach liest der Server sofort neu ein.
+- **Letzter Lesevorgang**: was beim letzten Einlesen gefunden wurde und was
+  nicht. Ein leerer Bestand sagt hier selbst, woran es lag, siehe unten.
 - **Neu einlesen**, mit oder ohne Erzwingen.
+
+### Wenn der Bestand leer bleibt
+
+Ein falscher oder weggelaufener Datenpfad sah früher aus wie ein
+erfolgreicher Lauf über eine leere Datenbank: „0 Aktionen", und nirgends
+ein Fehler. Der Lader überliest fehlende Dateien mit Absicht, eine halbe
+Datenbank ist besser als keine, aber schweigen darf er darüber nicht.
+
+Jeder Ladelauf schreibt deshalb ein Protokoll mit: welche der drei
+Verzeichnisse da waren, welche Basistabelle wie viele Datensätze lieferte,
+welche fehlte und welche sich nicht lesen ließ, jeweils mit dem Kürzel des
+Betriebssystems (`ENOENT` für fehlt, `EACCES` für keine Rechte). Es steht
+im Protokoll des Dienstes und in der Verwaltung unter „Letzter
+Lesevorgang". Dazu steht in jeder Zeile, wer das Lesen ausgelöst hat:
+`startup`, `admin`, `api` oder `root-change`.
+
+Die Zeilen, nach denen sich im Protokoll zu suchen lohnt:
+
+```bash
+docker compose logs rest-kias | grep -E "data read|data root|not readable"
+```
+
+## Protokolle durchsuchen: Loki und Grafana
+
+Optional, abschaltbar, ab Werk aus. Mit dem Profil `logs` kommen drei
+Container dazu:
+
+| Dienst | Aufgabe | Port |
+|---|---|---|
+| `kias-alloy` | sammelt die Protokolle der Container ein | keiner |
+| `kias-loki` | bewahrt sie auf, voreingestellt 30 Tage | keiner, nur im Compose-Netz |
+| `kias-grafana` | zeigt sie an | **5178** |
+
+Einschalten in der `.env`:
+
+```bash
+COMPOSE_PROFILES=admin,logs
+```
+
+Beim Debian-Skript genügt `--with-logs`, dann steht die Adresse am Ende
+in der Zusammenfassung.
+
+**Anmeldung:** Benutzer `admin`, Passwort aus `KIAS_ADMIN_PASSWORD`, also
+dasselbe wie bei der Verwaltung. Ein Passwort für beides, aber keine
+gemeinsame Anmeldung: wer sich in der Verwaltung anmeldet, ist in Grafana
+noch nicht angemeldet.
+
+Eine Übersicht ist eingerichtet, sobald Grafana läuft, unter
+**neo-KIAS → neo-KIAS**:
+
+- **Lesevorgänge**: jeder Ladelauf mit Auslöser und Ergebnis
+- **Datensätze beim letzten Lesen**, grün oder rot. Fällt der Wert auf 0,
+  ist der Datenpfad nicht mehr da, wo er sein sollte
+- **Dauer eines Ladelaufs** und **nicht gelesene Dateien**
+- **Fehler je Dienst** und die Fehlerzeilen selbst
+- **Verwaltung**: Anmeldungen, Pfadwechsel, Einlesen von Hand
+
+Die Protokolle sind JSON, in Grafana also durchsuchbar statt nur lesbar:
+
+```
+{service="rest-kias"} | json | records = 0
+```
+
+Woher Alloy die Zeilen nimmt, steht in `ALLOY_CONFIG`. Voreingestellt ist
+`config.alloy`, das über den Docker-Socket liest und dadurch auch
+Postgres und die letzten Zeilen vor einem Absturz mitbekommt. Steht der
+Socket nicht zur Verfügung, tut es `config-files.alloy`; dann werden die
+rotierenden Dateien unter `KIAS_LOG_DIR` gelesen.
+
+Aufbewahrung über `LOKI_RETENTION` (Voreinstellung `720h`, also 30 Tage).
+Die drei Container brauchen zusammen rund 300 MB Arbeitsspeicher.
 
 ## Die Seite „Änderungen"
 

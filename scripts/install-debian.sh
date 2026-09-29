@@ -32,6 +32,7 @@ API_PORT=""
 ADMIN_PORT=""
 ADMIN_PASSWORD=""
 NO_ADMIN=0
+WITH_LOGS=0
 SKIP_DOCKER=0
 NO_START=0
 
@@ -148,6 +149,10 @@ Optionen:
   --admin-password PASS Passwort der Verwaltung. Ohne Angabe wird beim
                         ersten Lauf eines erzeugt und am Ende angezeigt.
   --no-admin            Ohne Verwaltung und ohne Datenbank installieren.
+  --with-logs           Zusaetzlich Loki, Alloy und Grafana starten. Die
+                        Protokolle sind dann unter Port 5178 durchsuchbar,
+                        Anmeldung wie bei der Verwaltung. Kostet rund
+                        300 MB Arbeitsspeicher.
                         Dann gibt es keinen Weg, die Daten neu einzulesen.
   --skip-docker         Docker nicht installieren, es ist bereits vorhanden.
   --no-start            Dienst einrichten, aber nicht starten.
@@ -175,6 +180,7 @@ while [ $# -gt 0 ]; do
     --admin-password) ADMIN_PASSWORD="${2:-}"; shift 2 ;;
     --admin-password=*) ADMIN_PASSWORD="${1#*=}"; shift ;;
     --no-admin) NO_ADMIN=1; shift ;;
+    --with-logs) WITH_LOGS=1; shift ;;
     --skip-docker) SKIP_DOCKER=1; shift ;;
     --no-start) NO_START=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -348,6 +354,21 @@ else
   # wieder einschalten: dafür gibt es keinen Auftrag.
 fi
 
+# Die Protokollsammlung ist ein eigenes Profil und kommt nur auf Ansage
+# dazu. Umgekehrt wird sie nicht von selbst wieder entfernt: wer sie
+# einmal eingeschaltet hat, soll sie nach einem Update noch haben.
+if [ "$WITH_LOGS" -eq 1 ]; then
+  CURRENT_PROFILES="$(env_get COMPOSE_PROFILES)"
+  case ",${CURRENT_PROFILES}," in
+    *,logs,*) : ;;
+    *) env_set COMPOSE_PROFILES "$([ -n "$CURRENT_PROFILES" ] && echo "${CURRENT_PROFILES},logs" || echo "logs")" ;;
+  esac
+  env_default GRAFANA_PORT 5178
+  env_default LOKI_RETENTION 720h
+  env_default ALLOY_CONFIG config.alloy
+  info "Mit Protokollsammlung (--with-logs): Grafana auf Port $(env_get GRAFANA_PORT)."
+fi
+
 ADMIN_ON="$(env_get COMPOSE_PROFILES)"
 
 if [ -n "$ADMIN_ON" ]; then
@@ -506,6 +527,7 @@ $(printf '%sneo-KIAS ist installiert.%s' "$C_OK" "$C_OFF")
   Schnittstelle   http://${HOSTADDR}:${API_PORT_IN_USE}
   API-Doku        http://${HOSTADDR}:${PORT_IN_USE}/api/docs
   Verwaltung      $([ -n "$ADMIN_ON" ] && echo "http://${HOSTADDR}:${ADMIN_PORT_IN_USE}" || echo 'abgeschaltet (--no-admin)')
+  Protokolle      $(case ",$(env_get COMPOSE_PROFILES)," in *,logs,*) echo "http://${HOSTADDR}:$(env_get GRAFANA_PORT)" ;; *) echo 'abgeschaltet (--with-logs schaltet sie ein)' ;; esac)
 EOF
 
 if [ -n "$ADMIN_ON" ]; then

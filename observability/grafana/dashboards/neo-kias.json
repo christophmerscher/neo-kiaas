@@ -1,0 +1,218 @@
+{
+  "title": "neo-KIAS",
+  "uid": "neo-kias",
+  "tags": ["neo-kias"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Dienst",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values(service)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Daten lesen",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "logs",
+      "title": "Lesevorgänge: Start, Ergebnis, Datenpfad",
+      "description": "Jeder Ladelauf mit seinem Auslöser und dem, was dabei herauskam. Hier steht, ob der Bestand leer blieb und warum.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 1 },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"$service\"} |~ \"reading the data|data read|data root|data files|not readable|base table|lookup table|unchanged since\"",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Datensätze beim letzten Lesen",
+      "description": "Aus der Zeile \"data read complete\". Springt der Wert auf 0, ist der Datenpfad nicht mehr da, wo er sein sollte.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "last_over_time({job=~\"docker|neo-kias\"} | json | msg =~ \"data read.*\" | unwrap records [$__auto])",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Dauer eines Ladelaufs",
+      "description": "Wird das Lesen deutlich langsamer, liegt das meist am Datenträger oder an der Freigabe.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 12 },
+      "fieldConfig": {
+        "defaults": { "unit": "ms", "custom": { "drawStyle": "bars", "fillOpacity": 40 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max_over_time({job=~\"docker|neo-kias\"} | json | msg = \"data read complete\" | unwrap ms [$__auto])",
+          "legendFormat": "Dauer",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Nicht gelesene Dateien",
+      "description": "Fehlende und fehlgeschlagene Basistabellen je Ladelauf. Alles über 0 gehört angesehen.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 12 },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max_over_time({job=~\"docker|neo-kias\"} | json | msg =~ \"data read.*\" | unwrap files_missing [$__auto])",
+          "legendFormat": "fehlend",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "expr": "max_over_time({job=~\"docker|neo-kias\"} | json | msg =~ \"data read.*\" | unwrap files_failed [$__auto])",
+          "legendFormat": "fehlgeschlagen",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Fehler und Zugriffe",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fehler und Warnungen je Dienst",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\", severity=~\"error|fatal\"} [$__auto]))",
+          "legendFormat": "{{service}}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Menge der Protokollzeilen",
+      "description": "Ein plötzlicher Ausschlag oder ein plötzliches Verstummen sagt oft mehr als die Zeilen selbst.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 19 },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\"} [$__auto]))",
+          "legendFormat": "{{service}}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Alle Fehler",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 26 },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"$service\", severity=~\"error|fatal\"}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Verwaltung",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 }
+    },
+    {
+      "type": "logs",
+      "title": "Anmeldungen, Pfadwechsel, Einlesen von Hand",
+      "description": "Wer hat wann etwas verstellt. Bei einem Bestand, der plötzlich anders aussieht, die erste Frage.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 37 },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"$service\"} |~ \"admin logged in|admin login rejected|data root saved|data root tested|data root changed|reload requested|reload finished\"",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}

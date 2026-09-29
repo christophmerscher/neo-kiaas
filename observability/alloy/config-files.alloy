@@ -1,0 +1,82 @@
+// Grafana Alloy, Fassung ohne Docker-Socket.
+//
+// Liest die rotierenden Protokolldateien, die neo-KIAS ohnehin unter
+// /logs schreibt. Kommt ohne Zugriff auf den Docker-Socket aus und ist
+// deshalb der Weg für Umgebungen, in denen der nicht zur Verfügung steht.
+//
+// Was hier fehlt: alles, was ein Container außerhalb seines eigenen
+// Protokollierers ausgibt, also Postgres und die letzten Zeilen vor
+// einem Absturz.
+//
+// In Betrieb genommen wird diese Fassung über die .env:
+//   ALLOY_CONFIG=config-files.alloy
+
+// ── Woher ──────────────────────────────────────────────────────────────
+
+local.file_match "kias" {
+	// pino-roll benennt die Dateien <dienst>.log.<datum>.<nr>.log.
+	path_targets = [
+		{__path__ = "/logs/rest-kias.log*", service = "rest-kias", job = "neo-kias"},
+		{__path__ = "/logs/neo-kias.log*", service = "neo-kias", job = "neo-kias"},
+		{__path__ = "/logs/admin-kias.log*", service = "admin-kias", job = "neo-kias"},
+	]
+	sync_period = "15s"
+}
+
+loki.source.file "kias" {
+	targets    = local.file_match.kias.targets
+	forward_to = [loki.process.kias.receiver]
+
+	// Neu gefundene Dateien ab dem Ende lesen. Ohne das schöbe der erste
+	// Start Monate alter Zeilen aus den rotierten Dateien nach Loki, die
+	// dort niemand erwartet und die zum Teil älter sind als die
+	// Aufbewahrung. Die Stände gelesener Dateien liegen im Datenordner
+	// und überleben einen Neustart.
+	tail_from_end = true
+}
+
+// ── Aufbereiten ────────────────────────────────────────────────────────
+
+loki.process "kias" {
+	stage.json {
+		expressions = {
+			level = "level",
+			app   = "app",
+			time  = "time",
+		}
+	}
+
+	stage.template {
+		source   = "severity"
+		template = "{{ if eq .level \"10\" }}trace{{ else if eq .level \"20\" }}debug{{ else if eq .level \"30\" }}info{{ else if eq .level \"40\" }}warn{{ else if eq .level \"50\" }}error{{ else if eq .level \"60\" }}fatal{{ else }}other{{ end }}"
+	}
+
+	stage.labels {
+		values = {
+			severity = "",
+		}
+	}
+
+	// Die Zeit aus der Zeile selbst und nicht die des Einlesens: nach
+	// einer Pause des Sammlers landen die Zeilen sonst alle auf dem
+	// Zeitpunkt, an dem er wieder anlief.
+	stage.timestamp {
+		source = "time"
+		format = "UnixMs"
+	}
+
+	forward_to = [loki.write.default.receiver]
+}
+
+// ── Wohin ──────────────────────────────────────────────────────────────
+
+loki.write "default" {
+	endpoint {
+		url = "http://kias-loki:3100/loki/api/v1/push"
+	}
+}
+
+logging {
+	level  = "warn"
+	format = "logfmt"
+}

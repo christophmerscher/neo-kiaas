@@ -16,7 +16,12 @@
 #               darf. Nicht für die KIAS-Daten selbst, die bleiben in den
 #               DBF-Dateien. Ebenfalls nur im Profil "admin".
 #
+# Dazu drei weitere im Profil "logs", die nichts mit der Anwendung selbst
+# zu tun haben: kias-loki sammelt die Protokolle, kias-alloy liefert sie
+# dorthin, kias-grafana zeigt sie an (Port 5178).
+#
 # Verwaltung ein oder aus: COMPOSE_PROFILES in der .env (siehe dort).
+# Mit Protokollen also COMPOSE_PROFILES=admin,logs.
 #
 # The image is always built from the sources in this repository; there is
 # no pre-built image to pull. Configuration comes from a sibling .env file:
@@ -232,5 +237,113 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── Protokolle: Loki, Alloy, Grafana ──────────────────────────────────
+  # Nur mit "logs" in COMPOSE_PROFILES. Drei Container, zusammen etwa
+  # 300 MB Arbeitsspeicher: auf einem Server nichts, auf einem kleinen
+  # Testrechner spürbar. Deshalb abschaltbar und ab Werk aus.
+  #
+  # Sinn der Sache: die Protokolle durchsuchbar machen, statt sie mit
+  # "docker compose logs | grep" zu durchkämmen. Vor allem die Zeilen der
+  # Ladeläufe, an denen zu sehen ist, wann ein Bestand leer wurde.
+
+  kias-loki:
+    profiles: ["logs"]
+    image: grafana/loki:3.3.2
+    container_name: kias-loki
+    restart: unless-stopped
+    # expand-env, damit die Aufbewahrung aus der .env kommen kann.
+    command: ["-config.file=/etc/loki/loki.yml", "-config.expand-env=true"]
+
+    environment:
+      LOKI_RETENTION: "${LOKI_RETENTION:-720h}"
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      - ./observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - kias-loki-data:/loki
+
+    # Absichtlich ohne Port nach außen: Loki spricht nur mit Alloy und
+    # Grafana, und beide stehen im selben Netz.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  kias-alloy:
+    profiles: ["logs"]
+    image: grafana/alloy:v1.5.1
+    container_name: kias-alloy
+    restart: unless-stopped
+    # root, weil der Docker-Socket sonst nicht zu lesen ist.
+    user: root
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+
+    environment:
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      # Welche der beiden Fassungen gilt, steht in der .env: der
+      # Docker-Socket liefert mehr, die Dateifassung kommt ohne ihn aus.
+      - "./observability/alloy/${ALLOY_CONFIG:-config.alloy}:/etc/alloy/config.alloy:ro"
+      # Lesend. Alloy soll Container sehen, nicht steuern.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "${KIAS_LOG_DIR:-./logs}:/logs:ro"
+      # Merkt sich, wie weit gelesen wurde. Ohne das fängt Alloy nach
+      # jedem Neustart von vorn oder verliert den Anschluss.
+      - kias-alloy-data:/var/lib/alloy/data
+
+    depends_on:
+      kias-loki:
+        condition: service_healthy
+
+  kias-grafana:
+    profiles: ["logs"]
+    image: grafana/grafana:11.4.0
+    container_name: kias-grafana
+    restart: unless-stopped
+
+    ports:
+      - "${GRAFANA_PORT:-5178}:3000"
+
+    environment:
+      # Dieselben Zugangsdaten wie die Verwaltung. Kein einmaliges
+      # Anmelden über beide, aber ein Passwort statt zweier.
+      GF_SECURITY_ADMIN_USER: "${KIAS_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${KIAS_ADMIN_PASSWORD:-admin}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Ein Werkstattrechner meldet nichts nach Hause und braucht keine
+      # Neuigkeiten aus der Grafana-Welt.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_LOG_LEVEL: warn
+      TZ: "${TZ:-Europe/Berlin}"
+
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - kias-grafana-data:/var/lib/grafana
+
+    depends_on:
+      kias-loki:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   kias-db-data:
+  kias-loki-data:
+  kias-alloy-data:
+  kias-grafana-data:
