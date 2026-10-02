@@ -306,11 +306,81 @@ inklusive aufrufender IP und Antwortzeit.
 
 ## Updates einspielen
 
+Zwei Dinge, die gern verwechselt werden: neue **KIAS-Daten** und eine neue
+**Fassung von neo-KIAS**.
+
+### Neue KIAS-Daten
+
 Neue Update Dateien in den Ordner `Update/` kopieren. Bei Docker sind sie durch
 das Volume sofort im Container sichtbar. Danach die Daten neu einlesen, in der
 **Verwaltung** unter http://localhost:5177, Karte „Neu einlesen".
 
 Ein Neustart ist nicht nötig.
+
+### Eine neue Fassung von neo-KIAS
+
+Auf dem Server das Repository auf den gewünschten Stand bringen und dann:
+
+```bash
+sudo ./scripts/update-debian.sh
+```
+
+Mehr ist nicht zu tun. Das Skript sichert die bestehende Installation,
+hält den Stapel an, legt den neuen Quelltext darüber, ergänzt die `.env`
+um die Schlüssel, die in der neuen Fassung dazugekommen sind, erneuert
+die systemd-Unit, baut das Image, startet und sieht nach, ob die neue
+Fassung auch tatsächlich antwortet. Eingestellte Werte, Daten, Logs und
+die Datenbank der Verwaltung bleiben unangetastet.
+
+Soll beim Sprung auf 1.3.0 oder später gleich die Protokollsammlung
+dazukommen:
+
+```bash
+sudo ./scripts/update-debian.sh --with-logs
+```
+
+Ging etwas schief, führt ein Aufruf zurück auf den Stand davor:
+
+```bash
+sudo ./scripts/update-debian.sh --rollback
+```
+
+Die letzten drei Sicherungen bleiben als `/opt/neo-kias.backup-<Datum>`
+liegen, ältere räumt das Skript selbst ab.
+
+Unter Windows macht das die MSI: eine neuere Fassung ersetzt die ältere,
+ohne dass vorher etwas deinstalliert werden muss.
+
+## Wenn etwas nicht stimmt
+
+```bash
+sudo ./scripts/analyse-kias.sh data
+```
+
+Das Skript stellt die Fragen, die bei einem leeren Bestand immer zuerst
+gestellt werden, und es stellt sie an beiden Enden. Erst auf dem Wirt:
+Steht der Pfad aus der `.env` überhaupt zur Verfügung, ist er eine
+Netzfreigabe, ist sie eingehängt, sind `Daten/`, `Update/` und
+`Formulare/` da und lesbar, lässt sich wirklich in eine DBF-Datei
+hineinlesen. Dann dieselben Fragen im Container, denn dort muss es
+ankommen.
+
+Genau dazwischen sitzt der häufigste Fehler: verschwindet die Quelle
+eines Bind-Mounts auf dem Wirt, legt Docker im Container ein leeres
+Verzeichnis an. Von innen sieht alles gesund aus, nur ist nichts da.
+Weichen die beiden Seiten voneinander ab, sagt das Skript es.
+
+Weitere Befehle:
+
+| Befehl | Zeigt |
+|---|---|
+| `env` | Welche Einstellungen gelten, ohne Passwörter |
+| `services` | Container, Zustand, Neustarts, Ports |
+| `logs [N]` | Die Zeilen zu Lesevorgängen und Fehlern, lesbar aufbereitet |
+| `all` | Alles nacheinander |
+
+Der Rückgabewert ist 0, wenn nichts zu beanstanden war, sonst 1. Damit
+lässt sich das Skript auch in eine Überwachung hängen.
 
 ### Wann wirklich gelesen wird
 

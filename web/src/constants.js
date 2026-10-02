@@ -1,7 +1,7 @@
 /** Build-time constants for the neo-KIAS frontend. */
 
 /** Current application version. Bumped manually before each release tag. */
-export const VERSION = '1.3.0';
+export const VERSION = '1.3.1';
 
 /** localStorage keys we own — listed here so they're easy to grep. */
 export const STORAGE_KEYS = Object.freeze({

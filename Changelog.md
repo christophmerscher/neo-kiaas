@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-10-02
+
+### Added
+- `scripts/update-debian.sh`: aktualisiert eine bestehende Installation
+  auf den Stand des Repositorys, aus dem es läuft. Sichert vorher,
+  tauscht den Quelltext, zieht die `.env` nach (fehlende Schlüssel aus
+  der neuen `.env.example`, eingestellte Werte bleiben), erneuert die
+  systemd-Unit, baut das Image, startet und sieht nach, ob die neue
+  Fassung auch antwortet. `--with-logs` schaltet dabei die
+  Protokollsammlung ein, `--rollback` führt auf den Stand davor zurück.
+- `scripts/analyse-kias.sh`: Untersuchung mit eigenen Befehlen. `data`
+  liest den Datenpfad aus der `.env`, prüft die Erreichbarkeit samt
+  Einhängepunkt und Freigabe, sieht für `Daten/`, `Update/` und
+  `Formulare/` einzeln nach und stellt dieselben Fragen anschließend im
+  Container. Weichen Wirt und Container voneinander ab, steht das als
+  eigener Befund da; genau so sieht ein Bind-Mount aus, dessen Quelle
+  verschwunden ist. Dazu `env`, `services`, `logs` und `all`.
+  Rückgabewert 1, wenn etwas zu beanstanden war, damit sich das Skript
+  auch in eine Überwachung hängen lässt.
+
+### Fixed
+- **Zugangsdaten standen im Protokoll.** `pino-http` schreibt in der
+  Voreinstellung sämtliche Kopfzeilen mit, also auch `authorization`
+  (bei HTTP Basic das Passwort, nur mit Base64 verpackt) und `cookie`
+  samt gültigem Sitzungsschlüssel der Verwaltung. Das lag in den
+  rotierenden Dateien und wanderte seit 1.3.0 zusätzlich nach Loki.
+  Kopfzeilen werden jetzt nicht mehr mitgeschrieben, und `authorization`,
+  `cookie` und `set-cookie` sind zusätzlich auf Ebene des Protokollierers
+  unkenntlich gemacht.
+- Eine Protokollzeile je Anfrage ist dadurch von rund 1,5 kB auf etwa
+  ein Drittel geschrumpft, was auch die Aufbewahrung in Loki entlastet.
+- Der verrutschte Hilfetext von `install-debian.sh`: der Satz zur
+  abgeschalteten Verwaltung stand unter `--with-logs`.
+
 ## [1.3.0] — 2026-09-29
 
 ### Added
@@ -245,7 +279,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   including caller IP and forwarded IP.
 - Optional car photos in Fahrzeuge cards via `KIAS_SHOW_CAR_IMAGES`.
 
-[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/christophmerscher/neo-kiaas/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.3.1
 [1.3.0]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.3.0
 [1.2.1]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.1
 [1.2.0]: https://github.com/christophmerscher/neo-kiaas/releases/tag/v1.2.0

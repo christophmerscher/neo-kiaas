@@ -149,11 +149,11 @@ Optionen:
   --admin-password PASS Passwort der Verwaltung. Ohne Angabe wird beim
                         ersten Lauf eines erzeugt und am Ende angezeigt.
   --no-admin            Ohne Verwaltung und ohne Datenbank installieren.
+                        Dann gibt es keinen Weg, die Daten neu einzulesen.
   --with-logs           Zusaetzlich Loki, Alloy und Grafana starten. Die
                         Protokolle sind dann unter Port 5178 durchsuchbar,
                         Anmeldung wie bei der Verwaltung. Kostet rund
                         300 MB Arbeitsspeicher.
-                        Dann gibt es keinen Weg, die Daten neu einzulesen.
   --skip-docker         Docker nicht installieren, es ist bereits vorhanden.
   --no-start            Dienst einrichten, aber nicht starten.
   -h, --help            Diese Hilfe.
