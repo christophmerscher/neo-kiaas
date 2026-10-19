@@ -67,6 +67,24 @@ export function Detail({ detail, vehicleLabel, onNavigateRef, onSelectBulletin }
     />
   );
 
+  // Alte und neue Reparaturgruppen in eine Liste, die neuen zuerst: die
+  // meisten Aktionen sind in beiden Strukturen eingeordnet, und zwei
+  // getrennte Abschnitte für dieselbe Sache nebeneinander wären eine
+  // Unterscheidung, die niemanden interessiert. Woher die Einordnung
+  // stammt, steht im Tooltip, bei den neuen zusätzlich die Hauptgruppe.
+  const repGrups = [
+    ...(detail.repNGrups || []).map(g => ({
+      NR: g.NR,
+      CTEXT: g.CTEXT,
+      title: g.GRTEXT ? `Hauptgruppe ${g.GRUPPE} ${g.GRTEXT}` : 'Neue Gruppenstruktur',
+    })),
+    ...(detail.repGrups || []).map(g => ({
+      NR: g.NR,
+      CTEXT: g.CTEXT,
+      title: 'Alte Gruppenstruktur',
+    })),
+  ];
+
   const kenndaten = [
     ['Datum', fmtDateTime(detail.A_DAT)],
     ['Nachrichtenart', nArtKenndaten(detail.N_ART)],
@@ -138,6 +156,19 @@ export function Detail({ detail, vehicleLabel, onNavigateRef, onSelectBulletin }
                 title={`${fmtDateTime(v.VON) || ''} – ${fmtDateTime(v.BIS) || ''}`.trim()}
               >
                 {v.INTBEZEICH || v.BEZEICH || v.FZ}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {repGrups.length > 0 && (
+        <section className="section">
+          <h3>Reparaturgruppen ({repGrups.length})</h3>
+          <div className="chiplist">
+            {repGrups.map(g => (
+              <span key={g.NR} className="chip rg" title={g.title}>
+                {g.NR}{g.CTEXT ? ` — ${g.CTEXT}` : ''}
               </span>
             ))}
           </div>

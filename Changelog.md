@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-10-19
+
+### Added
+- **Reparaturgruppen im Detail.** Unter den Fahrzeugen steht jetzt, in
+  welche Gruppen eine Aktion einsortiert ist, etwa „414-01 Batterie,
+  Befestigung u. Kabel" und „31 Ladesystem". Das ist neben dem Fahrzeug
+  die zweite Achse, nach der KIAS selbst navigiert, und sie fehlte
+  bisher vollständig in der Oberfläche, obwohl die Schnittstelle einen
+  Teil davon schon lieferte.
+- `/api/bulletin/:code` liefert dazu das neue Feld `repNGrups` neben dem
+  bisherigen `repGrups`. Getrennt und nicht zusammengeworfen, weil die
+  Nummernkreise nicht vergleichbar sind: „31" gegen „414-01".
+
+### Fixed
+- **Die neue Gruppenstruktur wurde gar nicht eingelesen.** `FO_AKT_FZ`
+  führt zwei Spalten, `REPGRUP` für die alten zweistelligen Gruppen und
+  `WREPGRUP` für die neuen sechsstelligen aus dem TSI-Ordner ab 2001.
+  Indiziert war nur die erste. Von 317.837 Verknüpfungen tragen 152.084
+  die alte und 163.111 die neue Gruppe, nie beide auf derselben Zeile;
+  über alle Zeilen einer Aktion hinweg sind 9.730 Aktionen in beiden
+  Strukturen eingeordnet, 1.610 nur in der alten und 114 nur in der
+  neuen. Die neue Hälfte lag damit brach.
+- In der Volltextsuche fanden Treffer aus `FO_REPNGRUP` keine Aktion
+  mehr: aufgelöst wurde über den Index der alten, zweistelligen Nummern,
+  in dem eine „414-01" nie vorkommt. Der Treffer wurde stillschweigend
+  verworfen. Jetzt gibt es dafür einen eigenen Index.
+
 ## [1.3.2] — 2026-10-19
 
 ### Fixed

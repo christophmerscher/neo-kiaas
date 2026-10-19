@@ -1261,6 +1261,9 @@ header h1.clickable { cursor: pointer; user-select: none; }
 .chip.sym { background: var(--warn-bg); color: var(--warn-fg); }
 .chip.kw { background: #f3e8fd; color: #5b21b6; }
 [data-theme="dark"] .chip.kw { background: #2c1f3d; color: #d8b4fe; }
+/* Reparaturgruppen über die Akzentfarben und nicht über eigene Hexwerte:
+   die sind in beiden Themes schon aufeinander abgestimmt. */
+.chip.rg { background: var(--accent-soft); color: var(--accent-strong); }
 
 .form-link {
   color: var(--accent);
