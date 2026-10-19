@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-10-19
+
+### Fixed
+- **Drei Nachrichtenarten trugen die falsche Bezeichnung.** `L` stand als
+  „Lieferanten-Information" in der Oberfläche, ist aber die
+  **Schwerpunktliste**; `M` stand als „Meldung" und ist **Aktuelles zu
+  Modellen**; `G` stand als „Gewährleistungsinformation" und ist die
+  **Allgemeine Service-Information**. Betroffen waren 974 der 12.381
+  Nachrichten. Die Buchstaben muss man nicht raten: KIAS führt sie je
+  Fabrikat im Klartext in `System\Fabrikate.DBF`, und die Daten bestätigen
+  es (`SP990603` heißt „Liste nicht kulanzfähiger Bauteile", `A0001/05`
+  entspricht dem Nummernformat für „Aktuelles zu Modellen"). Woher die
+  Bezeichnungen stammen, steht jetzt als Kommentar in
+  `web/src/utils/nArt.js`, damit sie niemand wieder zurückrät.
+- `S` heißt jetzt „Service-Rundschreiben (SR)" statt „Service-Aktion", das
+  war mit `A` zu verwechseln.
+- Die Nachrichtenart `I` ist entfallen; einen solchen Buchstaben gibt es
+  im Bestand nicht und im Fabrikat auch nicht. `A`, `O` und `T` bleiben
+  unverändert, die waren richtig.
+
 ## [1.3.1] — 2026-10-02
 
 ### Added

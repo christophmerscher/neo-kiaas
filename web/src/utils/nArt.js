@@ -1,31 +1,44 @@
 /**
  * Lookup helpers for the single-letter Nachrichtenart codes (N_ART column).
  *
- * The codes are KIAS conventions (Aktion, OASIS, TSI, …). We keep a short
- * label for badges and a long one for tooltips / detail tables.
+ * Die Buchstaben sind keine Konvention, die man sich herleiten muss: KIAS
+ * führt sie in `System\Fabrikate.DBF` je Fabrikat mit Klartext mit. Für
+ * Ford stehen dort TYPE1..TYPE8 und die zugehörigen TYPETXT-Spalten, und
+ * genau daraus stammen die Bezeichnungen hier. Drei davon waren vorher
+ * geraten und falsch (L, M, G), deshalb der Hinweis: wer sie ändern will,
+ * sieht bitte erst in dieser Tabelle nach.
+ *
+ * Gegenprobe an den Daten:
+ *   L → `SP990603` „Liste nicht kulanzfähiger Bauteile"  (Schwerpunktliste)
+ *   M → `A0001/05` „Fz mit Xenon-Scheinwerfer …"          (Aktuelles zu Modellen)
+ *   G → `18-7002`  „Einführung des vollständig neuen Ford GT"
+ *
+ * `H` („Frei") ist im Fabrikat abgeschaltet und kommt im Bestand nicht
+ * vor; unbekannte Buchstaben werden unverändert durchgereicht.
  */
 
 /** Short labels used in compact badges. */
 const SHORT = Object.freeze({
   A: 'Aktion',
-  G: 'Gewährleistung',
-  I: 'Information',
-  L: 'Lieferinfo',
-  M: 'Meldung',
+  G: 'Service-Info',
+  L: 'Schwerpunkt',
+  M: 'Aktuelles',
   O: 'OASIS',
-  S: 'Service',
+  S: 'SR',
   T: 'TSI',
 });
 
 /** Long labels used in tooltips and Kenndaten tables. */
 const LONG = Object.freeze({
+  // A bleibt „Aktion / Servicemaßnahme" und wird nicht zu
+  // „Rückruf-Aktion": unter diesem Buchstaben stehen laut Hilfe auch
+  // Service-Programme und dringende Arbeiten vor der Auslieferung.
   A: 'Aktion / Servicemaßnahme',
-  G: 'Gewährleistungsinformation',
-  I: 'Information',
-  L: 'Lieferanten-Information',
-  M: 'Meldung',
+  G: 'Allgemeine Service-Information',
+  L: 'Schwerpunktliste',
+  M: 'Aktuelles zu Modellen',
   O: 'OASIS-Information',
-  S: 'Service-Aktion',
+  S: 'Service-Rundschreiben (SR)',
   T: 'Technische Service-Information (TSI)',
 });
 
