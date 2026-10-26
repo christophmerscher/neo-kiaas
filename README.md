@@ -419,6 +419,22 @@ im Protokoll des Dienstes und in der Verwaltung unter „Letzter
 Lesevorgang". Dazu steht in jeder Zeile, wer das Lesen ausgelöst hat:
 `startup`, `admin`, `api` oder `root-change`.
 
+**Ein leerer Lauf ersetzt den Bestand nicht mehr.** Findet ein
+Lesevorgang keine einzige Aktion, obwohl welche im Speicher stehen, wird
+er verworfen: der bisherige Stand bleibt stehen, die Suche arbeitet
+weiter, und in der Oberfläche steht, dass der Stand eingefroren ist und
+seit wann. `/api/reload` und die Verwaltung antworten in diesem Fall mit
+409 und dem Grund, nicht mit einem grünen „fertig". Der Hintergrund ist
+ein echter Fall: ein Bind-Mount auf eine Windows-Freigabe zeigte nach
+einem Neustart ins Leere, der nächste Ladelauf übernahm die Leere, und
+der gute Bestand war bis zum nächsten Containerstart verloren.
+
+Die Daten werden ohnehin nur zum Lesen gebraucht und liegen danach im
+Arbeitsspeicher. Kommt das Verzeichnis zurück, räumt der nächste
+erfolgreiche Lauf den Hinweis von selbst wieder weg. Der Preis: wurde die
+Datenbank wirklich geleert, braucht es einen Neustart des Dienstes, damit
+der leere Stand gilt.
+
 Die Zeilen, nach denen sich im Protokoll zu suchen lohnt:
 
 ```bash

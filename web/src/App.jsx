@@ -407,6 +407,17 @@ function LandingPage({
           </div>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </div>
+        {/* Ein eingefrorener Bestand sieht aus wie ein aktueller. Wenn der
+            Server seine Daten nicht mehr nachlesen kann, muss das hier
+            stehen und nicht nur im Protokoll. */}
+        {status?.readError && (
+          <div className="stale-notice">
+            Der Server konnte die Daten zuletzt nicht neu einlesen
+            ({fmtDateTime(status.readError.at)}). Angezeigt wird der Stand vom{' '}
+            {fmtDateTime(status.readError.keptAt)}. Neuere Aktionen fehlen
+            möglicherweise.
+          </div>
+        )}
         <div className="landing-footer">
           {status?.loaded && (
             <>

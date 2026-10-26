@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.1] — 2026-10-26
+
+### Fixed
+- **Ein leerer Lesevorgang hat den guten Bestand überschrieben.** Gemeldet
+  als „Programm leert Datenbank": nach einiger Laufzeit stand die Suche
+  auf 0 Aktionen, und neu einlesen half nicht. Die Kette war diese: der
+  Lader überliest fehlende Dateien mit Absicht und liefert leere Listen,
+  und `Store.load()` hat dieses Ergebnis ungeprüft übernommen. Damit war
+  der vollständige Bestand aus dem Arbeitsspeicher weg, obwohl er zum
+  Arbeiten gereicht hätte. Ein Lauf, der keine einzige Aktion findet,
+  während welche im Speicher stehen, wird jetzt verworfen. Stand,
+  Fingerabdruck und Daten bleiben unangetastet.
+- **Der verworfene Lauf wurde als Erfolg gemeldet.** Die Verwaltung zeigte
+  einen grünen Kasten mit „Erzwungen neu eingelesen. 0 Dateien geprüft
+  (0 ms). Bestand: 0 Aktionen." `/api/reload` und `/api/admin/reload`
+  antworten nun mit **409** und dem Satz aus dem Leseprotokoll, die
+  Verwaltung zeigt ihn rot.
+- Die Suche sah einen eingefrorenen Bestand nicht von einem aktuellen
+  unterscheiden. `/api/status` liefert dafür das neue Feld `readError`
+  (Zeitpunkt, Auslöser, Grund, Stand des gehaltenen Bestands), die
+  Startseite zeigt daraus einen Hinweis, und die Verwaltung schaltet die
+  Zustandsplakette auf „Stand eingefroren".
+
+### Notes
+- Der Auslöser lag außerhalb dieses Programms: ein Bind-Mount auf eine
+  Windows-Freigabe (`${KIAS_DATA_DIR}:/data:ro`) wird beim Start des
+  Containers einmal aufgelöst. Hängt die Freigabe zu diesem Zeitpunkt
+  nicht, bindet Docker das leere Verzeichnis darunter, und zwar
+  dauerhaft: ein späteres Einhängen auf dem Wirt erreicht den Container
+  nicht mehr (Mount-Propagation steht auf `rprivate`). Diese Fassung
+  macht daraus einen Hinweis statt eines Datenverlusts; die Ursache
+  behebt man im Betrieb, etwa mit einem Docker-Volume mit `type: cifs`
+  oder mit `RequiresMountsFor` in der systemd-Unit.
+- Wurde die Datenbank tatsächlich geleert, gilt der leere Stand erst nach
+  einem Neustart des Dienstes.
+
 ## [1.4.0] — 2026-10-19
 
 ### Added
