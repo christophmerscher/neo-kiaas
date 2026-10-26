@@ -1,0 +1,54 @@
+# Die Datenfreigabe als Docker-Volume statt als Bind-Mount.
+#
+# Warum es diese Datei gibt: ein Bind-Mount (`${KIAS_DATA_DIR}:/data:ro`)
+# wird beim Start des Containers einmal aufgelöst. Was danach auf dem Wirt
+# ein- oder ausgehängt wird, erreicht den Container nicht mehr, die
+# Propagation steht auf rprivate. Hängt eine Windows-Freigabe im Betrieb
+# kurz aus, etwa durch einen Automount mit Leerlaufzeit oder einen Abriss
+# der SMB-Sitzung, sieht der Container danach das leere Verzeichnis unter
+# der Freigabe, während auf dem Wirt alles in Ordnung aussieht.
+#
+# Mit einem Volume baut Docker die Verbindung selbst auf, und zwar beim
+# Start des Containers. Der Container kann dann nicht auf ein leeres
+# Verzeichnis zeigen: entweder die Freigabe steht, oder der Container
+# startet gar nicht erst.
+#
+# Benutzung:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cifs.yml up -d
+#
+# Vorher prüfen, dass unter /data wirklich nur noch eine Einhängung steht:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.cifs.yml config | grep -A4 volumes
+#
+# Dafür gehören in die .env vier zusätzliche Zeilen:
+#
+#   KIAS_SMB_HOST=192.168.1.50        Rechnername oder IP des Windows-Rechners
+#   KIAS_SMB_SHARE=KIAS27             Name der Freigabe, ohne Schrägstriche
+#   KIAS_SMB_USER=kias                Konto mit Leserecht auf der Freigabe
+#   KIAS_SMB_PASSWORD=...             dessen Passwort
+#
+# Das Konto braucht nur Lesen. `ro` steht zusätzlich in den Optionen, damit
+# aus diesem Container heraus nichts geschrieben werden kann, selbst wenn
+# das Konto es dürfte.
+#
+# KIAS_DATA_DIR wird in dieser Betriebsart nicht mehr gebraucht; die
+# Verwaltung zeigt als Pfad weiterhin /data, denn das ist der Ort im
+# Container.
+
+services:
+  rest-kias:
+    volumes:
+      - "kias-daten:/data:ro"
+
+volumes:
+  kias-daten:
+    driver: local
+    driver_opts:
+      type: cifs
+      device: "//${KIAS_SMB_HOST:?Set KIAS_SMB_HOST in .env}/${KIAS_SMB_SHARE:?Set KIAS_SMB_SHARE in .env}"
+      # uid/gid 1000: unter dieser Kennung läuft der Dienst im Container,
+      # sonst gehören die Dateien niemandem, den er kennt.
+      # vers=3.1.1 passt zu Windows 10, 11 und Server 2016 aufwärts; ältere
+      # Freigaben brauchen vers=2.1, SMB1 kommt nicht in Frage.
+      o: "username=${KIAS_SMB_USER:?Set KIAS_SMB_USER in .env},password=${KIAS_SMB_PASSWORD:?Set KIAS_SMB_PASSWORD in .env},vers=3.1.1,ro,uid=1000,gid=1000,iocharset=utf8,noserverino"

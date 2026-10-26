@@ -383,6 +383,16 @@ chown -R "${CONTAINER_UID}:${CONTAINER_UID}" "${INSTALL_DIR}/logs"
 # Stand gehören, nicht zu dem, was vor zwei Fassungen galt.
 
 DOCKER_BIN="$(command -v docker)"
+# Liegen die Daten auf einer Freigabe, darf der Dienst nicht vor ihr
+# starten. RequiresMountsFor löst den Pfad in die zuständige .mount-Unit
+# auf und wartet darauf. Ohne das bindet Docker beim Start das leere
+# Verzeichnis unter dem Einhängepunkt, und der Bestand bleibt leer, bis
+# jemand den Container neu erstellt.
+UNIT_DATA_DIR="$(env_get KIAS_DATA_DIR)"
+MOUNT_LINE=""
+case "$UNIT_DATA_DIR" in
+  /*) MOUNT_LINE="RequiresMountsFor=${UNIT_DATA_DIR}" ;;
+esac
 cat > "$UNIT_FILE" <<EOF
 [Unit]
 Description=neo-KIAS Explorer
@@ -390,6 +400,7 @@ Documentation=https://github.com/christophmerscher/neo-kiaas
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
+${MOUNT_LINE}
 
 [Service]
 Type=oneshot

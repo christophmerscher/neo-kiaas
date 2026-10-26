@@ -438,6 +438,15 @@ DOCKER_BIN="$(command -v docker)"
 [ -n "$DOCKER_BIN" ] || die "docker nicht im PATH gefunden."
 
 info "Schreibe ${UNIT_FILE} (docker: ${DOCKER_BIN})"
+# Liegen die Daten auf einer Freigabe, darf der Dienst nicht vor ihr
+# starten. RequiresMountsFor löst den Pfad in die zuständige .mount-Unit
+# auf und wartet darauf. Ohne das bindet Docker beim Start das leere
+# Verzeichnis unter dem Einhängepunkt, und der Bestand bleibt leer, bis
+# jemand den Container neu erstellt.
+MOUNT_LINE=""
+case "$DATA_DIR" in
+  /*) MOUNT_LINE="RequiresMountsFor=${DATA_DIR}" ;;
+esac
 cat > "$UNIT_FILE" <<EOF
 [Unit]
 Description=neo-KIAS Explorer
@@ -445,6 +454,7 @@ Documentation=https://github.com/christophmerscher/neo-kiaas
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
+${MOUNT_LINE}
 
 [Service]
 Type=oneshot

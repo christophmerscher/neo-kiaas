@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.4.1] — 2026-10-26
 
+### Added
+- `scripts/analyse-kias.sh mount`: vergleicht die Einhängungen von Wirt
+  und Container. Zählt die DBF-Dateien auf beiden Seiten, zeigt
+  `findmnt`, die eingehängten Netzfreigaben, einen Automount in der
+  `fstab` und die Meldungen des Kerns zu `cifs`. Laufen die Zahlen
+  auseinander, ist es die Einhängung und kein Rechteproblem.
+- `scripts/mount-wache.sh`: hält den Zeitpunkt fest, an dem die Daten
+  verschwinden. Schreibt im Takt eine Zeile mit den Dateizahlen beider
+  Seiten und dem Zustand des Dienstes und legt beim ersten
+  Auseinanderlaufen einen vollständigen Befund ab, solange der Zustand
+  noch da ist. Gedacht für genau den Fall, dass niemand davor sitzt.
+- `docker-compose.cifs.yml`: hängt die Windows-Freigabe als Docker-Volume
+  ein statt als Bind-Mount. Damit baut Docker die Verbindung beim Start
+  des Containers selbst auf, und der Container kann nicht auf ein leeres
+  Verzeichnis zeigen.
+- Die systemd-Unit aus Installations- und Update-Skript trägt jetzt
+  `RequiresMountsFor` auf den Datenpfad. Nach einem Neustart startet der
+  Dienst damit nicht mehr vor der Freigabe.
+
 ### Fixed
 - **Ein leerer Lesevorgang hat den guten Bestand überschrieben.** Gemeldet
   als „Programm leert Datenbank": nach einiger Laufzeit stand die Suche
