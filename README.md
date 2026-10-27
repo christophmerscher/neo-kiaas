@@ -419,6 +419,83 @@ im Protokoll des Dienstes und in der Verwaltung unter „Letzter
 Lesevorgang". Dazu steht in jeder Zeile, wer das Lesen ausgelöst hat:
 `startup`, `admin`, `api` oder `root-change`.
 
+**Ein leerer Lauf ersetzt den Bestand nicht mehr.** Findet ein
+Lesevorgang keine einzige Aktion, obwohl welche im Speicher stehen, wird
+er verworfen: der bisherige Stand bleibt stehen, die Suche arbeitet
+weiter, und in der Oberfläche steht, dass der Stand eingefroren ist und
+seit wann. `/api/reload` und die Verwaltung antworten in diesem Fall mit
+409 und dem Grund, nicht mit einem grünen „fertig". Der Hintergrund ist
+ein echter Fall: ein Bind-Mount auf eine Windows-Freigabe zeigte nach
+einem Neustart ins Leere, der nächste Ladelauf übernahm die Leere, und
+der gute Bestand war bis zum nächsten Containerstart verloren.
+
+Die Daten werden ohnehin nur zum Lesen gebraucht und liegen danach im
+Arbeitsspeicher. Kommt das Verzeichnis zurück, räumt der nächste
+erfolgreiche Lauf den Hinweis von selbst wieder weg. Der Preis: wurde die
+Datenbank wirklich geleert, braucht es einen Neustart des Dienstes, damit
+der leere Stand gilt.
+
+### Wenn die Daten im laufenden Betrieb verschwinden
+
+Der häufigste Fall ist kein Fehler im Programm, sondern die Einhängung.
+Liegen die Daten auf einer Windows-Freigabe und wird diese als
+Bind-Mount hereingereicht (`${KIAS_DATA_DIR}:/data:ro`), dann löst Docker
+den Pfad **beim Start des Containers einmal** auf. Was danach auf dem
+Wirt ein- oder ausgehängt wird, erreicht den Container nicht mehr, die
+Propagation steht auf `rprivate`. Hängt die Freigabe zwischendurch aus,
+etwa durch einen Automount mit Leerlaufzeit oder einen Abriss der
+SMB-Sitzung, sieht der Container danach das leere Verzeichnis unter dem
+Einhängepunkt, während auf dem Wirt alles in Ordnung aussieht.
+
+Die Frage, die das entscheidet, lautet: sind die Daten auf dem **Wirt**
+noch da, während der **Container** nichts sieht? Dafür gibt es:
+
+```bash
+sudo ./scripts/analyse-kias.sh mount
+```
+
+Der Befehl vergleicht beide Einhängetabellen, zählt die DBF-Dateien auf
+beiden Seiten, sieht in `/etc/fstab` nach einem Automount und zeigt die
+Meldungen des Kerns zu `cifs`. Laufen die Zahlen auseinander, ist es die
+Einhängung und kein Rechteproblem.
+
+Weil der Ausfall im Betrieb auftritt und niemand davor sitzt, gibt es
+eine Wache, die den Zeitpunkt festhält:
+
+```bash
+sudo nohup ./scripts/mount-wache.sh > /dev/null 2>&1 &
+tail -f logs/mount-wache.log
+```
+
+Sie schreibt im Takt eine Zeile mit den Dateizahlen von Wirt und
+Container und dem, was der Dienst meldet. Beim ersten Auseinanderlaufen
+legt sie zusätzlich einen vollständigen Befund unter
+`logs/mount-befund-<Zeitstempel>.txt` ab, solange der Zustand noch da
+ist.
+
+**Sofort wieder arbeitsfähig** wird der Server mit
+
+```bash
+docker compose up -d --force-recreate rest-kias
+```
+
+denn damit löst Docker den Pfad neu auf. Ein Neustart des Wirts ist dafür
+nicht nötig.
+
+**Dauerhaft** löst man es, indem Docker die Freigabe selbst einhängt
+statt einen Wirtspfad hereinzureichen. Dafür liegt `docker-compose.cifs.yml`
+bereit:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cifs.yml up -d
+```
+
+Die vier dafür nötigen Zeilen in der `.env` stehen im Kopf dieser Datei.
+Bleibt es beim Bind-Mount, sollte der Mount in der `fstab` wenigstens
+`_netdev` und keine Leerlaufzeit haben; die systemd-Unit der Installation
+trägt seit dieser Fassung `RequiresMountsFor` auf den Datenpfad, damit der
+Dienst nach einem Neustart nicht vor der Freigabe hochkommt.
+
 Die Zeilen, nach denen sich im Protokoll zu suchen lohnt:
 
 ```bash

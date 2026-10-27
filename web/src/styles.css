@@ -1265,6 +1265,20 @@ header h1.clickable { cursor: pointer; user-select: none; }
    die sind in beiden Themes schon aufeinander abgestimmt. */
 .chip.rg { background: var(--accent-soft); color: var(--accent-strong); }
 
+/* Hinweis auf einen eingefrorenen Bestand. Warnfarbe und nicht Fehler:
+   die Suche funktioniert weiter, nur eben auf dem Stand von vorhin. */
+.stale-notice {
+  max-width: 720px;
+  margin: 0 auto 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md, 10px);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+
 .form-link {
   color: var(--accent);
   text-decoration: none;

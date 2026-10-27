@@ -13,6 +13,7 @@
 #   sudo ./scripts/analyse-kias.sh env        Welche Einstellungen gelten
 #   sudo ./scripts/analyse-kias.sh services   Container und ihr Zustand
 #   sudo ./scripts/analyse-kias.sh logs       Die Zeilen der Lesevorgänge
+#   sudo ./scripts/analyse-kias.sh mount      Einhängungen von Wirt und Container
 #   sudo ./scripts/analyse-kias.sh all        Alles nacheinander
 #
 # Der Rückgabewert ist 0, wenn nichts zu beanstanden war, sonst 1. Damit
@@ -61,6 +62,9 @@ Befehle:
               ausgegeben.
   services    Container, Zustand, Neustarts, Ports.
   logs [N]    Die letzten N Zeilen zu Lesevorgängen und Fehlern (Standard 40).
+  mount       Die Einhängungen beider Seiten vergleichen. Beantwortet die
+              Frage, ob die Daten wirklich weg sind oder ob nur der
+              Container eine andere Sicht hat als der Wirt.
   all         Alles nacheinander.
 
 Optionen:
@@ -80,7 +84,7 @@ LOG_LINES=40
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    data|env|services|logs|all) COMMAND="$1"; shift
+    data|env|services|logs|mount|all) COMMAND="$1"; shift
       if [ "$COMMAND" = "logs" ] && [ $# -gt 0 ] && [ "${1#-}" = "$1" ]; then
         LOG_LINES="$1"; shift
       fi
@@ -493,6 +497,151 @@ cmd_logs() {
   fi
 }
 
+# ── mount ──────────────────────────────────────────────────────────────────
+#
+# Die Frage, die `data` offen lässt: wenn im Container nichts ankommt, liegt
+# das daran, dass die Daten auf dem Wirt weg sind, oder daran, dass der
+# Container eine andere Sicht hat als der Wirt?
+#
+# Ein Bind-Mount wird beim Start des Containers einmal aufgelöst und landet
+# als Kopie in dessen Namensraum. Was danach auf dem Wirt ein- oder
+# ausgehängt wird, erreicht ihn nicht mehr (Propagation steht auf
+# rprivate). Deshalb vergleicht dieser Befehl die Einhängetabellen beider
+# Seiten: steht beim Container kein cifs oder nfs, sondern das Dateisystem
+# der lokalen Platte, dann zeigt /data auf das leere Verzeichnis unter der
+# Freigabe und nicht auf die Freigabe selbst.
+
+cmd_mount() {
+  local data_dir
+  data_dir="$(env_get KIAS_DATA_DIR)"
+  [ -n "$data_dir" ] || { bad "KIAS_DATA_DIR steht nicht in ${ENV_FILE}."; return; }
+
+  head1 "Einhängetabelle auf dem Wirt"
+  if command -v findmnt >/dev/null 2>&1; then
+    probe findmnt -o TARGET,SOURCE,FSTYPE,OPTIONS --target "$data_dir" 2>/dev/null \
+      | sed 's/^/  /' || soft "findmnt hat nicht geantwortet."
+  else
+    probe mount 2>/dev/null | grep -F "$data_dir" | sed 's/^/  /' \
+      || hint "Kein eigener Mount auf ${data_dir}, es liegt auf der lokalen Platte."
+  fi
+
+  local host_fs host_src
+  host_fs="$(probe findmnt -n -o FSTYPE --target "$data_dir" 2>/dev/null)"
+  host_src="$(probe findmnt -n -o SOURCE --target "$data_dir" 2>/dev/null)"
+
+  head1 "Netzfreigaben insgesamt"
+  local shares
+  shares="$(probe mount 2>/dev/null | grep -Ei 'type (cifs|nfs|nfs4|smb3)')"
+  if [ -n "$shares" ]; then
+    printf '%s\n' "$shares" | sed 's/^/  /'
+  else
+    soft "Es ist gar keine Netzfreigabe eingehängt."
+    hint "Wenn die Daten von einem anderen Rechner kommen, fehlt hier der Mount."
+  fi
+
+  head1 "Automatisches Aus- und Einhängen"
+  # Ein Automount hängt nach einer Leerlaufzeit wieder aus. Auf dem Wirt
+  # fällt das niemandem auf, der Container bekommt das neue Einhängen aber
+  # nie zu sehen. Das ist der Ablauf, der zu "die Daten waren einfach weg"
+  # passt, ohne dass jemand etwas neu gestartet hat.
+  local fstab_lines
+  fstab_lines="$(grep -v '^[[:space:]]*#' /etc/fstab 2>/dev/null | grep -F "$data_dir")"
+  if [ -n "$fstab_lines" ]; then
+    printf '%s\n' "$fstab_lines" | sed 's/^/  /'
+    # Eine fstab-Zeile hat sechs Felder: Gerät, Ort, Typ, Optionen, Dump, Pass.
+    # Ein hineinkopierter mount-Befehl sieht richtig aus, hängt beim Start aber
+    # nichts ein, und dann steht die Freigabe nur so lange, wie jemand sie von
+    # Hand gesetzt hat.
+    if ! printf '%s\n' "$fstab_lines" \
+      | awk -v d="$data_dir" 'NF >= 3 && ($2 == d || $2 == d "/") { ok = 1 } END { exit ok ? 0 : 1 }'; then
+      bad "Keine dieser Zeilen ist ein gültiger fstab-Eintrag für ${data_dir}."
+      hint "Erwartet wird: Gerät Ort Typ Optionen Dump Pass, also etwa"
+      hint "//rechner/freigabe ${data_dir} cifs credentials=/etc/kias-smb.cred,ro,uid=1000,gid=1000,_netdev,nofail 0 0"
+      hint "Nachprüfen mit: findmnt --verify, danach muss mount -a stumm durchlaufen."
+    elif printf '%s\n' "$fstab_lines" | grep -q 'x-systemd.automount'; then
+      soft "x-systemd.automount ist gesetzt. Hängt der Mount im Leerlauf aus, sieht der Container danach ein leeres Verzeichnis."
+      hint "Gegenmittel: x-systemd.idle-timeout=0, oder die Freigabe als Docker-Volume einhängen."
+    fi
+    if printf '%s\n' "$fstab_lines" | grep -q 'password='; then
+      soft "In der fstab steht ein Passwort im Klartext, die Datei ist für alle lesbar."
+      hint "Besser: credentials=/etc/kias-smb.cred mit chmod 600."
+    fi
+  else
+    hint "Kein Eintrag für ${data_dir} in /etc/fstab."
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl list-units --type=automount --no-legend 2>/dev/null | sed 's/^/  /' | head -5
+  fi
+
+  head1 "Sicht des Containers"
+  if ! have_docker || ! container_running rest-kias; then
+    soft "rest-kias läuft nicht, die Container-Sicht lässt sich nicht prüfen."
+    return
+  fi
+
+  # Den Typ aus der Einhängetabelle lesen, nicht aus stat: im Container steckt
+  # nur die BusyBox-Fassung von stat, und die kennt cifs nicht. Sie meldet dann
+  # UNKNOWN, obwohl die Freigabe sauber eingehängt ist.
+  local cmi cfs
+  cmi="$(in_container "grep ' /data ' /proc/1/mountinfo 2>/dev/null | head -1")"
+  cfs="$(printf '%s\n' "$cmi" | awk '{ for (i = 1; i <= NF; i++) if ($i == "-") { print $(i + 1); exit } }')"
+  if [ -z "$cfs" ]; then
+    cfs="$(in_container "stat -f -c %T /data 2>/dev/null")"
+    case "$cfs" in UNKNOWN|unknown) cfs="" ;; esac
+  fi
+  hint "Dateisystem unter /data im Container: ${cfs:-unbekannt}"
+  [ -n "$cmi" ] && printf '%s\n' "$cmi" | sed 's/^/  /'
+
+  local host_count cont_count
+  host_count="$(probe find "${data_dir}/Daten" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')"
+  cont_count="$(in_container "find /data/Daten -maxdepth 1 -type f 2>/dev/null | wc -l" | tr -d ' ')"
+  hint "Dateien in Daten/: Wirt ${host_count:-0}, Container ${cont_count:-0}"
+
+  if [ "${host_count:-0}" -gt 0 ] && [ "${cont_count:-0}" -eq 0 ]; then
+    bad "Auf dem Wirt liegen Daten, im Container kommt nichts an."
+    hint "Das ist kein Rechteproblem, sondern zwei verschiedene Einhängungen."
+    hint "Sofort hilft: docker compose up -d --force-recreate rest-kias"
+    hint "Dauerhaft: die Freigabe als Docker-Volume (type: cifs) einhängen."
+  elif [ "${host_count:-0}" -eq 0 ] && [ "${cont_count:-0}" -eq 0 ]; then
+    bad "Auf beiden Seiten ist Daten/ leer. Dann fehlt die Quelle, nicht der Mount."
+    hint "Auf dem Wirt nachsehen: ls -la ${data_dir} und mount | grep -i cifs"
+  elif [ "${cont_count:-0}" -gt 0 ]; then
+    good "Der Container sieht ${cont_count} Dateien in Daten/."
+  fi
+
+  case "$host_fs" in
+    cifs|nfs|nfs4|smb3)
+      hint "Wirt hängt ${host_fs} von ${host_src}."
+      case "$cfs" in
+        "")
+          hint "Der Typ im Container ließ sich nicht bestimmen, der Vergleich entfällt."
+          ;;
+        cifs|smb2|smb3|nfs|nfs4)
+          good "Der Container hängt ebenfalls auf einer Netzfreigabe (${cfs})."
+          ;;
+        *)
+          bad "Der Container hängt dagegen auf ${cfs}. Die beiden sehen nicht dieselbe Einhängung."
+          hint "Sofort hilft: docker compose up -d --force-recreate rest-kias"
+          ;;
+      esac
+      ;;
+    "") hint "Für ${data_dir} gibt es keinen eigenen Mount, es liegt auf der lokalen Platte." ;;
+    *)  hint "Wirt: ${host_fs} (${host_src})." ;;
+  esac
+
+  head1 "Meldungen des Kerns zu Freigaben"
+  local kern
+  kern="$(dmesg 2>/dev/null | grep -iE 'cifs|smb|nfs' | tail -12)"
+  if [ -n "$kern" ]; then
+    printf '%s\n' "$kern" | sed 's/^/  /'
+    if printf '%s' "$kern" | grep -qiE 'reconnect|session|timed out|not responding'; then
+      soft "Der Kern meldet Abrisse an der Freigabe. Zeitpunkt mit dem Ausfall vergleichen."
+    fi
+  else
+    hint "Keine Meldungen zu cifs, smb oder nfs im Puffer (dmesg braucht meist sudo)."
+  fi
+}
+
 # ── Ablauf ─────────────────────────────────────────────────────────────────
 
 printf '%sneo-KIAS, Untersuchung%s  (%s)\n' "$C_INFO" "$C_OFF" "$INSTALL_DIR"
@@ -502,7 +651,8 @@ case "$COMMAND" in
   env) cmd_env ;;
   services) cmd_services ;;
   logs) cmd_logs ;;
-  all) cmd_env; cmd_services; cmd_data; cmd_logs ;;
+  mount) cmd_mount ;;
+  all) cmd_env; cmd_services; cmd_data; cmd_mount; cmd_logs ;;
 esac
 
 printf '\n'

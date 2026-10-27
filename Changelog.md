@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-10-27
+
+### Fixed
+- Die Oberfläche zeigte 1.3.1, während Dienst und Verwaltung längst
+  weiter waren. Die Fassung stand als Konstante im Quelltext der
+  Oberfläche und wurde beim Erhöhen nicht mitgeführt. Sie kommt jetzt
+  beim Bauen aus der `package.json` im Wurzelverzeichnis, also aus
+  derselben Quelle wie `/api/health` und die Verwaltung, und kann nicht
+  mehr auseinanderlaufen.
+- `scripts/analyse-kias.sh mount` hat eine saubere Einhängung als Fehler
+  gemeldet. Der Typ des Dateisystems kam aus `stat -f`, und im Container
+  steckt nur die BusyBox-Fassung davon, die `cifs` nicht kennt und
+  deshalb `UNKNOWN` sagt. Der Typ wird jetzt aus `/proc/1/mountinfo`
+  gelesen, und wenn er sich nicht bestimmen lässt, entfällt der
+  Vergleich, statt einen Befund zu erfinden.
+
+### Added
+- `scripts/analyse-kias.sh mount` prüft die Zeilen in der `fstab` jetzt
+  auf Form. Ein hineinkopierter `mount`-Befehl sieht richtig aus, hängt
+  beim Hochfahren aber nichts ein, und die Freigabe steht dann nur so
+  lange, wie jemand sie von Hand gesetzt hat. Ein Passwort im Klartext
+  in der `fstab` wird ebenfalls angemerkt.
+
+## [1.4.1] — 2026-10-26
+
+### Added
+- `scripts/analyse-kias.sh mount`: vergleicht die Einhängungen von Wirt
+  und Container. Zählt die DBF-Dateien auf beiden Seiten, zeigt
+  `findmnt`, die eingehängten Netzfreigaben, einen Automount in der
+  `fstab` und die Meldungen des Kerns zu `cifs`. Laufen die Zahlen
+  auseinander, ist es die Einhängung und kein Rechteproblem.
+- `scripts/mount-wache.sh`: hält den Zeitpunkt fest, an dem die Daten
+  verschwinden. Schreibt im Takt eine Zeile mit den Dateizahlen beider
+  Seiten und dem Zustand des Dienstes und legt beim ersten
+  Auseinanderlaufen einen vollständigen Befund ab, solange der Zustand
+  noch da ist. Gedacht für genau den Fall, dass niemand davor sitzt.
+- `docker-compose.cifs.yml`: hängt die Windows-Freigabe als Docker-Volume
+  ein statt als Bind-Mount. Damit baut Docker die Verbindung beim Start
+  des Containers selbst auf, und der Container kann nicht auf ein leeres
+  Verzeichnis zeigen.
+- Die systemd-Unit aus Installations- und Update-Skript trägt jetzt
+  `RequiresMountsFor` auf den Datenpfad. Nach einem Neustart startet der
+  Dienst damit nicht mehr vor der Freigabe.
+
+### Fixed
+- **Ein leerer Lesevorgang hat den guten Bestand überschrieben.** Gemeldet
+  als „Programm leert Datenbank": nach einiger Laufzeit stand die Suche
+  auf 0 Aktionen, und neu einlesen half nicht. Die Kette war diese: der
+  Lader überliest fehlende Dateien mit Absicht und liefert leere Listen,
+  und `Store.load()` hat dieses Ergebnis ungeprüft übernommen. Damit war
+  der vollständige Bestand aus dem Arbeitsspeicher weg, obwohl er zum
+  Arbeiten gereicht hätte. Ein Lauf, der keine einzige Aktion findet,
+  während welche im Speicher stehen, wird jetzt verworfen. Stand,
+  Fingerabdruck und Daten bleiben unangetastet.
+- **Der verworfene Lauf wurde als Erfolg gemeldet.** Die Verwaltung zeigte
+  einen grünen Kasten mit „Erzwungen neu eingelesen. 0 Dateien geprüft
+  (0 ms). Bestand: 0 Aktionen." `/api/reload` und `/api/admin/reload`
+  antworten nun mit **409** und dem Satz aus dem Leseprotokoll, die
+  Verwaltung zeigt ihn rot.
+- Die Suche sah einen eingefrorenen Bestand nicht von einem aktuellen
+  unterscheiden. `/api/status` liefert dafür das neue Feld `readError`
+  (Zeitpunkt, Auslöser, Grund, Stand des gehaltenen Bestands), die
+  Startseite zeigt daraus einen Hinweis, und die Verwaltung schaltet die
+  Zustandsplakette auf „Stand eingefroren".
+
+### Notes
+- Der Auslöser lag außerhalb dieses Programms: ein Bind-Mount auf eine
+  Windows-Freigabe (`${KIAS_DATA_DIR}:/data:ro`) wird beim Start des
+  Containers einmal aufgelöst. Hängt die Freigabe zu diesem Zeitpunkt
+  nicht, bindet Docker das leere Verzeichnis darunter, und zwar
+  dauerhaft: ein späteres Einhängen auf dem Wirt erreicht den Container
+  nicht mehr (Mount-Propagation steht auf `rprivate`). Diese Fassung
+  macht daraus einen Hinweis statt eines Datenverlusts; die Ursache
+  behebt man im Betrieb, etwa mit einem Docker-Volume mit `type: cifs`
+  oder mit `RequiresMountsFor` in der systemd-Unit.
+- Wurde die Datenbank tatsächlich geleert, gilt der leere Stand erst nach
+  einem Neustart des Dienstes.
+
 ## [1.4.0] — 2026-10-19
 
 ### Added

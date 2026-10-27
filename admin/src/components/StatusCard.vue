@@ -15,6 +15,7 @@ const data = computed(() => props.state.data);
 const tone = computed(() => {
   if (data.value.loading) return 'warn';
   if (!data.value.looksLikeKias) return 'bad';
+  if (data.value.readError) return 'warn';
   return data.value.loaded && data.value.bulletins > 0 ? 'ok' : 'warn';
 });
 
@@ -22,6 +23,10 @@ const label = computed(() => {
   if (data.value.loading) return 'liest ein';
   if (!data.value.looksLikeKias) return 'kein Daten/ unter dem Pfad';
   if (!data.value.loaded) return 'nicht geladen';
+  // Der Bestand steht, aber er ist eingefroren: das ist etwas anderes
+  // als „bereit" und gehört in die Plakette, nicht nur in eine Zeile
+  // weiter unten.
+  if (data.value.readError) return 'Stand eingefroren';
   return data.value.bulletins > 0 ? 'bereit' : 'geladen, aber leer';
 });
 
@@ -64,6 +69,13 @@ const percent = computed(() => {
         {{ data.progress.name || data.progress.stage }} · {{ percent }} %
       </p>
     </template>
+
+    <div v-if="data.readError" class="note warn">
+      Der letzte Leseversuch ({{ fmtDateTime(data.readError.at) }}, ausgelöst von
+      {{ data.readError.trigger }}) hat nichts gefunden und wurde verworfen.
+      Angezeigt wird weiterhin der Stand von {{ fmtDateTime(data.readError.keptAt) }}.
+      {{ data.readError.summary }}
+    </div>
 
     <div v-if="state.settings.configured && !state.settings.ready" class="note warn">
       Die Einstellungsdatenbank antwortet nicht ({{ state.settings.error || 'unbekannt' }}).
