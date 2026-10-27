@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.2] — 2026-10-27
+
+### Fixed
+- Die Oberfläche zeigte 1.3.1, während Dienst und Verwaltung längst
+  weiter waren. Die Fassung stand als Konstante im Quelltext der
+  Oberfläche und wurde beim Erhöhen nicht mitgeführt. Sie kommt jetzt
+  beim Bauen aus der `package.json` im Wurzelverzeichnis, also aus
+  derselben Quelle wie `/api/health` und die Verwaltung, und kann nicht
+  mehr auseinanderlaufen.
+- `scripts/analyse-kias.sh mount` hat eine saubere Einhängung als Fehler
+  gemeldet. Der Typ des Dateisystems kam aus `stat -f`, und im Container
+  steckt nur die BusyBox-Fassung davon, die `cifs` nicht kennt und
+  deshalb `UNKNOWN` sagt. Der Typ wird jetzt aus `/proc/1/mountinfo`
+  gelesen, und wenn er sich nicht bestimmen lässt, entfällt der
+  Vergleich, statt einen Befund zu erfinden.
+
+### Added
+- `scripts/analyse-kias.sh mount` prüft die Zeilen in der `fstab` jetzt
+  auf Form. Ein hineinkopierter `mount`-Befehl sieht richtig aus, hängt
+  beim Hochfahren aber nichts ein, und die Freigabe steht dann nur so
+  lange, wie jemand sie von Hand gesetzt hat. Ein Passwort im Klartext
+  in der `fstab` wird ebenfalls angemerkt.
+
 ## [1.4.1] — 2026-10-26
 
 ### Added

@@ -544,11 +544,27 @@ cmd_mount() {
   # fällt das niemandem auf, der Container bekommt das neue Einhängen aber
   # nie zu sehen. Das ist der Ablauf, der zu "die Daten waren einfach weg"
   # passt, ohne dass jemand etwas neu gestartet hat.
-  if grep -qE "$(printf '%s' "$data_dir" | sed 's/[]\/$*.^[]/\\&/g')" /etc/fstab 2>/dev/null; then
-    grep -E "$(printf '%s' "$data_dir" | sed 's/[]\/$*.^[]/\\&/g')" /etc/fstab | sed 's/^/  /'
-    if grep -E "$(printf '%s' "$data_dir" | sed 's/[]\/$*.^[]/\\&/g')" /etc/fstab | grep -q 'x-systemd.automount'; then
+  local fstab_lines
+  fstab_lines="$(grep -v '^[[:space:]]*#' /etc/fstab 2>/dev/null | grep -F "$data_dir")"
+  if [ -n "$fstab_lines" ]; then
+    printf '%s\n' "$fstab_lines" | sed 's/^/  /'
+    # Eine fstab-Zeile hat sechs Felder: Gerät, Ort, Typ, Optionen, Dump, Pass.
+    # Ein hineinkopierter mount-Befehl sieht richtig aus, hängt beim Start aber
+    # nichts ein, und dann steht die Freigabe nur so lange, wie jemand sie von
+    # Hand gesetzt hat.
+    if ! printf '%s\n' "$fstab_lines" \
+      | awk -v d="$data_dir" 'NF >= 3 && ($2 == d || $2 == d "/") { ok = 1 } END { exit ok ? 0 : 1 }'; then
+      bad "Keine dieser Zeilen ist ein gültiger fstab-Eintrag für ${data_dir}."
+      hint "Erwartet wird: Gerät Ort Typ Optionen Dump Pass, also etwa"
+      hint "//rechner/freigabe ${data_dir} cifs credentials=/etc/kias-smb.cred,ro,uid=1000,gid=1000,_netdev,nofail 0 0"
+      hint "Nachprüfen mit: findmnt --verify, danach muss mount -a stumm durchlaufen."
+    elif printf '%s\n' "$fstab_lines" | grep -q 'x-systemd.automount'; then
       soft "x-systemd.automount ist gesetzt. Hängt der Mount im Leerlauf aus, sieht der Container danach ein leeres Verzeichnis."
       hint "Gegenmittel: x-systemd.idle-timeout=0, oder die Freigabe als Docker-Volume einhängen."
+    fi
+    if printf '%s\n' "$fstab_lines" | grep -q 'password='; then
+      soft "In der fstab steht ein Passwort im Klartext, die Datei ist für alle lesbar."
+      hint "Besser: credentials=/etc/kias-smb.cred mit chmod 600."
     fi
   else
     hint "Kein Eintrag für ${data_dir} in /etc/fstab."
@@ -563,11 +579,18 @@ cmd_mount() {
     return
   fi
 
-  local cfs
-  cfs="$(in_container "stat -f -c %T /data 2>/dev/null")"
+  # Den Typ aus der Einhängetabelle lesen, nicht aus stat: im Container steckt
+  # nur die BusyBox-Fassung von stat, und die kennt cifs nicht. Sie meldet dann
+  # UNKNOWN, obwohl die Freigabe sauber eingehängt ist.
+  local cmi cfs
+  cmi="$(in_container "grep ' /data ' /proc/1/mountinfo 2>/dev/null | head -1")"
+  cfs="$(printf '%s\n' "$cmi" | awk '{ for (i = 1; i <= NF; i++) if ($i == "-") { print $(i + 1); exit } }')"
+  if [ -z "$cfs" ]; then
+    cfs="$(in_container "stat -f -c %T /data 2>/dev/null")"
+    case "$cfs" in UNKNOWN|unknown) cfs="" ;; esac
+  fi
   hint "Dateisystem unter /data im Container: ${cfs:-unbekannt}"
-  in_container "grep ' /data ' /proc/1/mountinfo 2>/dev/null || grep -E ' /data' /proc/self/mountinfo 2>/dev/null" \
-    | sed 's/^/  /' | head -3
+  [ -n "$cmi" ] && printf '%s\n' "$cmi" | sed 's/^/  /'
 
   local host_count cont_count
   host_count="$(probe find "${data_dir}/Daten" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')"
@@ -589,9 +612,18 @@ cmd_mount() {
   case "$host_fs" in
     cifs|nfs|nfs4|smb3)
       hint "Wirt hängt ${host_fs} von ${host_src}."
-      if [ -n "$cfs" ] && [ "$cfs" != "smb2" ] && [ "$cfs" != "nfs" ]; then
-        soft "Der Container meldet dagegen ${cfs}. Die beiden sehen nicht dieselbe Einhängung."
-      fi
+      case "$cfs" in
+        "")
+          hint "Der Typ im Container ließ sich nicht bestimmen, der Vergleich entfällt."
+          ;;
+        cifs|smb2|smb3|nfs|nfs4)
+          good "Der Container hängt ebenfalls auf einer Netzfreigabe (${cfs})."
+          ;;
+        *)
+          bad "Der Container hängt dagegen auf ${cfs}. Die beiden sehen nicht dieselbe Einhängung."
+          hint "Sofort hilft: docker compose up -d --force-recreate rest-kias"
+          ;;
+      esac
       ;;
     "") hint "Für ${data_dir} gibt es keinen eigenen Mount, es liegt auf der lokalen Platte." ;;
     *)  hint "Wirt: ${host_fs} (${host_src})." ;;

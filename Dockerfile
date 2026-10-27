@@ -20,8 +20,10 @@ WORKDIR /app/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-# Copy sources and produce the production bundle.
+# Copy sources and produce the production bundle. Die package.json aus dem
+# Wurzelverzeichnis kommt mit, weil vite.config.js die Fassung daraus liest.
 COPY web/ ./
+COPY package.json /app/package.json
 RUN npm run build
 
 # ---- Stage 2: build the Vue admin UI ---------------------------------------
