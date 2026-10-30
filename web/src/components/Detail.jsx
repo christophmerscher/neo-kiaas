@@ -149,15 +149,29 @@ export function Detail({ detail, vehicleLabel, onNavigateRef, onSelectBulletin }
         <section className="section">
           <h3>Fahrzeuge ({detail.vehicles.length})</h3>
           <div className="chiplist">
-            {detail.vehicles.map(v => (
-              <span
-                key={v.FZ}
-                className="chip fz"
-                title={`${fmtDateTime(v.VON) || ''} – ${fmtDateTime(v.BIS) || ''}`.trim()}
-              >
-                {v.INTBEZEICH || v.BEZEICH || v.FZ}
-              </span>
-            ))}
+            {detail.vehicles.map(v => {
+              // `former` heißt: die Zeile steht nicht mehr in FO_FZ, der
+              // Name stammt aus der Löschzeile der Update-Kette.
+              const weg = v.former;
+              const zeitraum = `${fmtDateTime(v.VON) || ''} – ${fmtDateTime(v.BIS) || ''}`.trim();
+              const herkunft = !weg ? '' : weg.renamedTo
+                ? `Code ${v.FZ} trägt seit ${weg.file} die Nummer ${weg.renamedTo}`
+                : `Mit ${weg.file} aus der Fahrzeugliste entfernt, Name zuletzt bekannt`;
+              return (
+                <span
+                  key={v.FZ}
+                  className={weg ? 'chip fz gone' : 'chip fz'}
+                  title={[zeitraum, herkunft].filter(Boolean).join(' · ')}
+                >
+                  {v.INTBEZEICH || v.BEZEICH || v.FZ}
+                  {weg && (
+                    <span className="chip-note">
+                      {weg.renamedTo ? `jetzt ${weg.renamedTo}` : 'entfallen'}
+                    </span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </section>
       )}

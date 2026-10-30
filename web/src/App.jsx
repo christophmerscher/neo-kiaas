@@ -514,7 +514,9 @@ function ClassicView({
               <select value={fz} onChange={sx(setFz)}>
                 <option value="">Alle Fahrzeuge</option>
                 {vehicles.map(v => (
-                  <option key={v.FZ} value={v.FZ}>{v.FZ} — {v.INTBEZEICH || v.BEZEICH}</option>
+                  <option key={v.FZ} value={v.FZ}>
+                    {v.FZ} — {v.INTBEZEICH || v.BEZEICH}{v.former ? ' (entfallen)' : ''}
+                  </option>
                 ))}
               </select>
             </div>
@@ -659,7 +661,9 @@ function GoogleView({
           <select value={fz} onChange={sx(setFz)}>
             <option value="">Alle Fahrzeuge</option>
             {vehicles.map(v => (
-              <option key={v.FZ} value={v.FZ}>{v.INTBEZEICH || v.BEZEICH || v.FZ}</option>
+              <option key={v.FZ} value={v.FZ}>
+                {v.INTBEZEICH || v.BEZEICH || v.FZ}{v.former ? ' (entfallen)' : ''}
+              </option>
             ))}
           </select>
           <select value={scode} onChange={sx(setScode)}>

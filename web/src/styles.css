@@ -1265,6 +1265,22 @@ header h1.clickable { cursor: pointer; user-select: none; }
    die sind in beiden Themes schon aufeinander abgestimmt. */
 .chip.rg { background: var(--accent-soft); color: var(--accent-strong); }
 
+/* Entfallenes Fahrzeug: der Name stimmt noch, die Zeile dahinter gibt es
+   nicht mehr. Gedämpft statt grün, damit man es sieht, ohne dass es wie
+   ein Fehler aussieht. Durchgestrichen wäre schlechter lesbar. */
+.chip.fz.gone {
+  background: var(--bg-soft);
+  color: var(--text-mute);
+  border: 1px dashed var(--border);
+}
+.chip-note {
+  margin-left: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  opacity: .75;
+}
+
 /* Hinweis auf einen eingefrorenen Bestand. Warnfarbe und nicht Fehler:
    die Suche funktioniert weiter, nur eben auf dem Stand von vorhin. */
 .stale-notice {
@@ -1497,6 +1513,16 @@ header h1.clickable { cursor: pointer; user-select: none; }
 }
 .veh-name strong { font-weight: 600; }
 .veh-alias { color: var(--text-mute); font-weight: 400; font-size: 13px; }
+.veh-gone {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  color: var(--text-mute);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
 .veh-range {
   font-size: 12px;
   color: var(--text-mute);

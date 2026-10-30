@@ -1,6 +1,6 @@
 {
   "name": "neo-kias",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Inoffizielle moderne Web-Oberfläche für die KIAS-Datenbank",
   "license": "MIT",
   "main": "server.js",

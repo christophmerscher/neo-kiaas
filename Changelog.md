@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.4.3] — 2026-10-30
+
+### Fixed
+- **Entfallene Fahrzeuge behalten ihren Namen.** Ford nimmt ausgelaufene
+  Modelle aus `FO_FZ` heraus, lässt die Verknüpfungen in `FO_AKT_FZ` aber
+  stehen. Im Bestand trifft das 14 Codes an gut 8.400 Zuordnungen, die
+  gesamten Nutzfahrzeuge darunter, und in der Oberfläche stand dort nur
+  noch die nackte Nummer, etwa `056` statt „Mustang 2015". Der Lader hebt
+  die Zeile beim Entfernen auf, die Löschzeile bringt den Namen mit.
+  Detailansicht, Trefferkarten, Fahrzeugliste und beide Filter zeigen ihn
+  wieder, gekennzeichnet als entfallen.
+  - Der Grabstein gilt nur, solange der Code tot ist. Vergibt eine
+    Lieferung `056` später für ein anderes Modell, räumt schon die
+    Updatezeile ihn weg, und Store wie Oberfläche fragen ohnehin immer
+    zuerst die lebende Tabelle. Eine Umbenennung führt den alten Code auf
+    den neuen („jetzt 103") statt ihn fallen zu lassen.
+  - Die Namen sind damit auch wieder suchbar. „Transit Connect 2002.5"
+    fand 14 Aktionen und findet jetzt 1.481, „Transit Custom PHEV" 44
+    statt 601, „Mustang 2015" 102 statt 810.
+  - Dafür tragen `/api/vehicles` und die Fahrzeuge in der Detailansicht
+    bei entfallenen Einträgen ein zusätzliches Feld `former` mit der
+    Updatedatei und, bei einer Umbenennung, dem neuen Code. Fehlt das
+    Feld, ist das Fahrzeug aktuell. Bestehende Auswertungen bleiben
+    unberührt.
+
 ## [1.4.2] — 2026-10-27
 
 ### Fixed

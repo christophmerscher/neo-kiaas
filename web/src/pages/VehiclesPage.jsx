@@ -205,6 +205,11 @@ function VehicleList({ items, onSelect }) {
               v.BEZEICH.toLowerCase() !== v.INTBEZEICH.toLowerCase() && (
                 <span className="veh-alias"> · {v.BEZEICH}</span>
               )}
+            {v.former && (
+              <span className="veh-gone" title={`Mit ${v.former.file} aus der Fahrzeugliste entfernt`}>
+                {v.former.renamedTo ? `jetzt ${v.former.renamedTo}` : 'entfallen'}
+              </span>
+            )}
           </span>
           <span className="veh-range">{fmtVehicleRange(v.VON, v.BIS)}</span>
           <span className="veh-arrow" aria-hidden="true">→</span>
